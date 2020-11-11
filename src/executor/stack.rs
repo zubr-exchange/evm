@@ -42,6 +42,17 @@ pub struct StackExecutor<'backend, 'config, B> {
 	config: &'config Config,
 	precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
 	substates: Vec<StackSubstate<'config>>,
+	/// Hook for calls (both internal Solidity calls and external calls). It can call executor.call_original ("notify" mode) or do all by itself ("handler" mode).
+	pub on_call: Option<fn(executor: &mut Self,
+		code_address: H160,
+		transfer: Option<Transfer>,
+		input: Vec<u8>,
+		target_gas: Option<usize>,
+		is_static: bool,
+		take_l64: bool,
+		take_stipend: bool,
+		context: Context,
+		is_external: bool,) -> Capture<(ExitReason, Vec<u8>), Infallible>>,
 }
 
 fn no_precompile(
@@ -83,6 +94,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 					depth: None,
 				}
 			],
+			on_call: None
 		}
 	}
 
@@ -243,11 +255,11 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			apparent_value: value,
 		};
 
-		match self.call_inner(address, Some(Transfer {
+		match self.call_inner_with_on_call(address, Some(Transfer {
 			source: caller,
 			target: address,
 			value
-		}), data, Some(gas_limit), false, false, false, context) {
+		}), data, Some(gas_limit), false, false, false, context, true) {
 			Capture::Exit((s, v)) => (s, v),
 			Capture::Trap(_) => unreachable!(),
 		}
@@ -577,7 +589,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
-	fn call_inner(
+	/// Call directly, without on_call even if set
+	pub fn call_original(
 		&mut self,
 		code_address: H160,
 		transfer: Option<Transfer>,
@@ -699,6 +712,24 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				Capture::Exit((ExitReason::Fatal(e), Vec::new()))
 			},
 		}
+	}
+
+	fn call_inner_with_on_call(
+		&mut self,
+		code_address: H160,
+		transfer: Option<Transfer>,
+		input: Vec<u8>,
+		target_gas: Option<usize>,
+		is_static: bool,
+		take_l64: bool,
+		take_stipend: bool,
+		context: Context,
+		is_external: bool,
+	) -> Capture<(ExitReason, Vec<u8>), Infallible> {
+		if self.on_call.is_some() {
+			return self.on_call.unwrap()(self, code_address, transfer, input, target_gas, is_static, take_l64, take_stipend, context, is_external);
+		}
+		return self.call_original(code_address, transfer, input, target_gas, is_static, take_l64, take_stipend, context);
 	}
 }
 
@@ -882,7 +913,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		is_static: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
-		self.call_inner(code_address, transfer, input, target_gas, is_static, true, true, context)
+		self.call_inner_with_on_call(code_address, transfer, input, target_gas, is_static, true, true, context, false)
 	}
 
 	fn pre_validate(
