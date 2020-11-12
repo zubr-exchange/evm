@@ -8,6 +8,8 @@ pub use self::memory::{MemoryBackend, MemoryVicinity, MemoryAccount};
 
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
+use core::convert::Infallible;
+use crate::{ExitReason, Capture, Transfer, Context};
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -79,6 +81,19 @@ pub trait Backend {
 	fn code(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: H256) -> H256;
+
+	/// Handles call if it is external
+	fn handle_call(
+		&self,
+		_code_address: H160,
+		_transfer: Option<Transfer>,
+		_input: Vec<u8>,
+		_target_gas: Option<usize>,
+		_is_static: bool,
+		_take_l64: bool,
+		_take_stipend: bool,
+		_context: Context,
+	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>>;
 }
 
 /// EVM backend that can apply changes.

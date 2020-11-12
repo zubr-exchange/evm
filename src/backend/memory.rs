@@ -3,6 +3,8 @@ use alloc::collections::BTreeMap;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
+use core::convert::Infallible;
+use crate::{ExitReason, Capture, Transfer, Context};
 
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -117,6 +119,20 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		self.state.get(&address)
 			.map(|v| v.storage.get(&index).cloned().unwrap_or(H256::default()))
 			.unwrap_or(H256::default())
+	}
+
+	fn handle_call(
+		&self, 
+		_code_address: H160,
+		_transfer: Option<Transfer>,
+		_input: Vec<u8>,
+		_target_gas: Option<usize>,
+		_is_static: bool,
+		_take_l64: bool,
+		_take_stipend: bool,
+		_context: Context,
+	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
+		None
 	}
 }
 
