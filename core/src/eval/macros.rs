@@ -1,5 +1,6 @@
 macro_rules! trace_op {
-	($($arg:tt)*) => (log::trace!(target: "evm", "OpCode {}", format_args!($($arg)*)));
+//	($($arg:tt)*) => (log::trace!(target: "evm", "OpCode {}", format_args!($($arg)*)));
+        ($($arg:tt)*) => ();
 }
 
 macro_rules! try_or_fail {

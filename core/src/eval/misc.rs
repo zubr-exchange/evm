@@ -64,7 +64,7 @@ pub fn calldatacopy(state: &mut Machine) -> Control {
 }
 
 pub fn pop(state: &mut Machine) -> Control {
-	pop!(state, val);
+	pop!(state, _val);
 	trace_op!("Pop  [@{}]: {}", state.stack.len(), val);
 	Control::Continue(1)
 }

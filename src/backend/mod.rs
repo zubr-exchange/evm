@@ -2,6 +2,7 @@
 //!
 //! Backends store state information of the VM, and exposes it to runtime.
 
+extern crate alloc;
 mod memory;
 
 pub use self::memory::{MemoryBackend, MemoryVicinity, MemoryAccount};
@@ -20,7 +21,20 @@ pub struct Basic {
 	pub nonce: U256,
 }
 
-pub use ethereum::Log;
+/// Alias for `Vec<u8>`. This type alias is necessary for rlp-derive to work correctly.
+pub type Bytes = alloc::vec::Vec<u8>;
+
+/// Log info from contract
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Log {
+        /// address
+	pub address: H160,
+        /// topics
+	pub topics: Vec<H256>,
+        /// data
+	pub data: Bytes,
+}
+//pub use ethereum::Log;
 
 /// Apply state operation.
 #[derive(Clone, Debug)]

@@ -4,6 +4,10 @@ use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 
+fn keccak256_digest(data: &[u8]) -> H256 {
+    H256::from_slice(Keccak256::digest(&data).as_slice())
+}
+
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
@@ -101,8 +105,10 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn code_hash(&self, address: H160) -> H256 {
 		self.state.get(&address).map(|v| {
-			H256::from_slice(Keccak256::digest(&v.code).as_slice())
-		}).unwrap_or(H256::from_slice(Keccak256::digest(&[]).as_slice()))
+                        keccak256_digest(&v.code)
+			//H256::from_slice(Keccak256::digest(&v.code).as_slice())
+		//}).unwrap_or(H256::from_slice(Keccak256::digest(&[]).as_slice()))
+                }).unwrap_or(keccak256_digest(&[]))
 	}
 
 	fn code_size(&self, address: H160) -> usize {
