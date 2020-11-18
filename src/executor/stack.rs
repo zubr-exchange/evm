@@ -29,8 +29,7 @@ pub struct StackAccount {
 }
 
 /// Stack-based executor.
-#[derive(Clone)]
-pub struct StackExecutor<'backend, 'config, B> {
+pub struct StackExecutor<'backend, 'config, 'oncall, B> {
 	backend: &'backend B,
 	config: &'config Config,
 	//gasometer: Gasometer<'config>,
@@ -40,6 +39,16 @@ pub struct StackExecutor<'backend, 'config, B> {
 	precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
 	is_static: bool,
 	depth: Option<usize>,
+	/// Hook for calls (both internal Solidity calls and external calls). Return None to handle it as in original
+	pub on_call: Option<&'oncall mut dyn FnMut(
+		H160,
+		Option<Transfer>,
+		Vec<u8>,
+		Option<usize>,
+		bool,
+		bool,
+		bool,
+		Context,) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>>>,
 }
 
 fn no_precompile(
@@ -50,7 +59,7 @@ fn no_precompile(
 	None
 }
 
-impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
+impl<'backend, 'config, 'oncall, B: Backend> StackExecutor<'backend, 'config, 'oncall, B> {
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
@@ -77,11 +86,12 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			precompile: precompile,
 			is_static: false,
 			depth: None,
+			on_call: None,
 		}
 	}
 
 	/// Create a substate executor from the current executor.
-	pub fn substate(&self, _gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, B> {
+	pub fn substate(&self, _gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, 'oncall, B> {
 		Self {
 			backend: self.backend,
 			//gasometer: Gasometer::new(gas_limit, self.gasometer.config()),
@@ -95,6 +105,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				None => Some(0),
 				Some(n) => Some(n + 1),
 			},
+			on_call: None,
 		}
 	}
 
@@ -113,9 +124,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that succeeded.
-	pub fn merge_succeed<'obackend, 'oconfig, OB>(
+	pub fn merge_succeed<'obackend, 'oconfig, 'ooncall, OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<'obackend, 'oconfig, 'ooncall, OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 		self.deleted.append(&mut substate.deleted);
@@ -127,9 +138,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that reverted.
-	pub fn merge_revert<'obackend, 'oconfig, OB>(
+	pub fn merge_revert<'obackend, 'oconfig, 'ooncall, OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<'obackend, 'oconfig, 'ooncall, OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -138,9 +149,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that failed.
-	pub fn merge_fail<'obackend, 'oconfig, OB>(
+	pub fn merge_fail<'obackend, 'oconfig, 'ooncall, OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<'obackend, 'oconfig, 'ooncall, OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -508,6 +519,12 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		take_stipend: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Infallible> {
+		if self.on_call.is_some() {
+			let capt_opt = self.on_call.as_mut().unwrap()(code_address, transfer.clone(), input.clone(), target_gas, is_static, take_l64, take_stipend, context.clone());
+			if capt_opt.is_some() {
+				return capt_opt.unwrap();
+			}
+		}
 //		macro_rules! try_or_fail {
 //			( $e:expr ) => {
 //				match $e {
@@ -604,7 +621,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 }
 
-impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config, B> {
+impl<'backend, 'config, 'oncall, B: Backend> Handler for StackExecutor<'backend, 'config, 'oncall, B> {
 	type CreateInterrupt = Infallible;
 	type CreateFeedback = Infallible;
 	type CallInterrupt = Infallible;
