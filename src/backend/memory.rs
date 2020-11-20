@@ -3,6 +3,7 @@ use alloc::collections::BTreeMap;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
+use evm_runtime::CreateScheme;
 
 fn keccak256_digest(data: &[u8]) -> H256 {
     H256::from_slice(Keccak256::digest(&data).as_slice())
@@ -124,6 +125,8 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 			.map(|v| v.storage.get(&index).cloned().unwrap_or(H256::default()))
 			.unwrap_or(H256::default())
 	}
+
+        fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
 }
 
 impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {

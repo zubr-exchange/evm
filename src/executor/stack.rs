@@ -330,14 +330,13 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	/// Get the create address from given scheme.
 	pub fn create_address(&self, scheme: CreateScheme) -> H160 {
 		match scheme {
-			CreateScheme::Create2 { caller: _, code_hash: _, salt: _ } => {
-//				let mut hasher = Keccak256::new();
-//				hasher.input(&[0xff]);
-//				hasher.input(&caller[..]);
-//				hasher.input(&salt[..]);
-//				hasher.input(&code_hash[..]);
-//				H256::from_slice(hasher.result().as_slice()).into()
-                                H256::zero().into()
+			CreateScheme::Create2 { caller, code_hash, salt } => {
+				let mut hasher = Keccak256::new();
+				hasher.input(&[0xff]);
+				hasher.input(&caller[..]);
+				hasher.input(&salt[..]);
+				hasher.input(&code_hash[..]);
+				H256::from_slice(hasher.result().as_slice()).into()
 			},
 			CreateScheme::Legacy { caller } => {
 				let nonce = self.nonce(caller);
@@ -395,6 +394,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		//try_or_fail!(self.gasometer.record_cost(gas_limit));
 
 		let address = self.create_address(scheme);
+                self.backend.create(&scheme, &address);
 		self.account_mut(caller).basic.nonce += U256::one();
 
 		let mut substate = self.substate(gas_limit, false);

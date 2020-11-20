@@ -9,6 +9,7 @@ pub use self::memory::{MemoryBackend, MemoryVicinity, MemoryAccount};
 
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
+use evm_runtime::CreateScheme;
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -93,6 +94,9 @@ pub trait Backend {
 	fn code(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: H256) -> H256;
+
+        /// Notification about create new address
+        fn create(&self, scheme: &CreateScheme, address: &H160);
 }
 
 /// EVM backend that can apply changes.
