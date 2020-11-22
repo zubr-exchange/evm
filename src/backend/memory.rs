@@ -1,9 +1,11 @@
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
+use core::convert::Infallible;
 use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
+use crate::{Capture, Transfer, Context, ExitReason};
 
 fn keccak256_digest(data: &[u8]) -> H256 {
     H256::from_slice(Keccak256::digest(&data).as_slice())
@@ -126,7 +128,20 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 			.unwrap_or(H256::default())
 	}
 
-        fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
+	fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
+
+	fn call_inner(&self,
+		_code_address: H160,
+		_transfer: Option<Transfer>,
+		_input: Vec<u8>,
+		_target_gas: Option<usize>,
+		_is_static: bool,
+		_take_l64: bool,
+		_take_stipend: bool,
+		_context: Context,
+	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
+		return None;
+	}
 }
 
 impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {

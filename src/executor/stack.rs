@@ -508,6 +508,10 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		take_stipend: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Infallible> {
+		let hook_res = self.backend.call_inner(code_address, transfer.clone(), input.clone(), target_gas, is_static, take_l64, take_stipend, context.clone());
+		if hook_res.is_some() {
+			return hook_res.unwrap();
+		}
 //		macro_rules! try_or_fail {
 //			( $e:expr ) => {
 //				match $e {
