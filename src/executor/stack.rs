@@ -508,10 +508,6 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		take_stipend: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Infallible> {
-		let hook_res = self.backend.call_inner(code_address, transfer.clone(), input.clone(), target_gas, is_static, take_l64, take_stipend, context.clone());
-		if hook_res.is_some() {
-			return hook_res.unwrap();
-		}
 //		macro_rules! try_or_fail {
 //			( $e:expr ) => {
 //				match $e {
@@ -553,6 +549,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
+		let transfer_clone = transfer.clone();
+
 		if let Some(transfer) = transfer {
 			match substate.transfer(transfer) {
 				Ok(()) => (),
@@ -575,6 +573,11 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 					Capture::Exit((ExitReason::Error(e), Vec::new()))
 				},
 			}
+		}
+
+		let hook_res = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend);
+		if hook_res.is_some() {
+			return hook_res.unwrap();
 		}
 
 		let mut runtime = Runtime::new(

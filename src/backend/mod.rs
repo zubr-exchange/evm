@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 use core::convert::Infallible;
 use primitive_types::{H160, H256, U256};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, Context, ExitReason};
+use crate::{Capture, Transfer, ExitReason};
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -109,7 +109,6 @@ pub trait Backend {
 		is_static: bool,
 		take_l64: bool,
 		take_stipend: bool,
-		context: Context,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>>;
 }
 

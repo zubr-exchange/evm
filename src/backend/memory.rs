@@ -5,7 +5,7 @@ use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, Context, ExitReason};
+use crate::{Capture, Transfer, ExitReason};
 
 fn keccak256_digest(data: &[u8]) -> H256 {
     H256::from_slice(Keccak256::digest(&data).as_slice())
@@ -138,7 +138,6 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_is_static: bool,
 		_take_l64: bool,
 		_take_stipend: bool,
-		_context: Context,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
 		return None;
 	}
