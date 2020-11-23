@@ -577,6 +577,25 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 
 		let hook_res = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend);
 		if hook_res.is_some() {
+			match hook_res.as_ref().unwrap() {
+				Capture::Exit((reason, _return_data)) => {
+					match reason {
+						ExitReason::Succeed(_) => {
+							let _ = self.merge_succeed(substate);
+						},
+						ExitReason::Revert(_) => {
+							let _ = self.merge_revert(substate);
+						},
+						ExitReason::Error(_) => {
+							let _ = self.merge_fail(substate);
+						},
+						ExitReason::Fatal(_) => {
+						},
+					}
+				},
+				Capture::Trap(_interrupt) => {
+				},
+			}
 			return hook_res.unwrap();
 		}
 
