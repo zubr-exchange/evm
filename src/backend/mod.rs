@@ -8,8 +8,10 @@ mod memory;
 pub use self::memory::{MemoryBackend, MemoryVicinity, MemoryAccount};
 
 use alloc::vec::Vec;
+use core::convert::Infallible;
 use primitive_types::{H160, H256, U256};
 use evm_runtime::CreateScheme;
+use crate::{Capture, Transfer, ExitReason};
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -95,8 +97,19 @@ pub trait Backend {
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: H256) -> H256;
 
-        /// Notification about create new address
-        fn create(&self, scheme: &CreateScheme, address: &H160);
+	/// Notification about create new address
+	fn create(&self, scheme: &CreateScheme, address: &H160);
+
+	/// Hook on Solidity's call
+	fn call_inner(&self,
+		code_address: H160,
+		transfer: Option<Transfer>,
+		input: Vec<u8>,
+		target_gas: Option<usize>,
+		is_static: bool,
+		take_l64: bool,
+		take_stipend: bool,
+	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>>;
 }
 
 /// EVM backend that can apply changes.
