@@ -76,7 +76,7 @@ pub trait Handler {
 		caller: H160,
 		scheme: CreateScheme,
 		value: U256,
-		init_code: Vec<u8>,
+		init_code: &Vec<u8>,
 		target_gas: Option<usize>,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Self::CreateInterrupt>;
 	/// Feed in create feedback.
