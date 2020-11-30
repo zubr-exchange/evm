@@ -130,6 +130,10 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
 
+	fn is_stateless_address(&self, _code_address: &H160) -> bool {
+		return false;
+	}
+
 	fn call_inner(&self,
 		_code_address: H160,
 		_transfer: Option<Transfer>,

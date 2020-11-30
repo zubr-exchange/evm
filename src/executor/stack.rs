@@ -537,8 +537,6 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		let code = self.code(code_address);
-
 		let mut substate = self.substate(gas_limit, is_static);
 		substate.account_mut(context.address);
 
@@ -561,17 +559,19 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		if let Some(ret) = (substate.precompile)(code_address, &input, Some(gas_limit)) {
-			return match ret {
-				Ok((s, out, _cost)) => {
-					//let _ = substate.gasometer.record_cost(cost);
-					let _ = self.merge_succeed(substate);
-					Capture::Exit((ExitReason::Succeed(s), out))
-				},
-				Err(e) => {
-					let _ = self.merge_fail(substate);
-					Capture::Exit((ExitReason::Error(e), Vec::new()))
-				},
+		if self.backend.is_stateless_address(&code_address) {
+			if let Some(ret) = (substate.precompile)(code_address, &input, Some(gas_limit)) {
+				return match ret {
+					Ok((s, out, _cost)) => {
+						//let _ = substate.gasometer.record_cost(cost);
+						let _ = self.merge_succeed(substate);
+						Capture::Exit((ExitReason::Succeed(s), out))
+					},
+					Err(e) => {
+						let _ = self.merge_fail(substate);
+						Capture::Exit((ExitReason::Error(e), Vec::new()))
+					},
+				}
 			}
 		}
 
@@ -579,18 +579,20 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		if hook_res.is_some() {
 			match hook_res.as_ref().unwrap() {
 				Capture::Exit((reason, _return_data)) => {
-					match reason {
-						ExitReason::Succeed(_) => {
-							let _ = self.merge_succeed(substate);
-						},
-						ExitReason::Revert(_) => {
-							let _ = self.merge_revert(substate);
-						},
-						ExitReason::Error(_) => {
-							let _ = self.merge_fail(substate);
-						},
-						ExitReason::Fatal(_) => {
-						},
+					if !self.backend.is_stateless_address(&code_address) {
+						match reason {
+							ExitReason::Succeed(_) => {
+								let _ = self.merge_succeed(substate);
+							},
+							ExitReason::Revert(_) => {
+								let _ = self.merge_revert(substate);
+							},
+							ExitReason::Error(_) => {
+								let _ = self.merge_fail(substate);
+							},
+							ExitReason::Fatal(_) => {
+							},
+						}
 					}
 				},
 				Capture::Trap(_interrupt) => {
@@ -598,6 +600,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 			return hook_res.unwrap();
 		}
+
+		let code = self.code(code_address);
 
 		let mut runtime = Runtime::new(
 			Rc::new(code),

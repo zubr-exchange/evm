@@ -100,6 +100,9 @@ pub trait Backend {
 	/// Notification about create new address
 	fn create(&self, scheme: &CreateScheme, address: &H160);
 
+	/// Check if address is reserved and not storing EVM state
+	fn is_stateless_address(&self, code_address: &H160) -> bool;
+
 	/// Hook on Solidity's call
 	fn call_inner(&self,
 		code_address: H160,
