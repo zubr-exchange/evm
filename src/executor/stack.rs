@@ -3,7 +3,7 @@ use core::cmp::min;
 use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
 use primitive_types::{U256, H256, H160};
-use crate::{ExitError, Stack, ExternalOpcode, Opcode, Capture, Handler, Transfer,
+use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer,
 			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config};
 use crate::backend::{Log, Basic, Apply, Backend};
 //use crate::gasometer::{self, Gasometer};
@@ -782,7 +782,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn pre_validate(
 		&mut self,
 		_context: &Context,
-		_opcode: Result<Opcode, ExternalOpcode>,
+		_opcode: Opcode,
 		_stack: &Stack
 	) -> Result<(), ExitError> {
 		// if let Some(cost) = gasometer::static_opcode_cost(opcode) {
