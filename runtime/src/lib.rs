@@ -101,6 +101,16 @@ impl<'config> Runtime<'config> {
 		}
 	}
 
+	/// Get return data
+	pub fn return_data(&self) -> &Vec<u8> {
+		&self.return_data_buffer
+	}
+
+	/// Set return data
+	pub fn set_return_data(&mut self, data: Vec<u8>) {
+		self.return_data_buffer = data;
+	}
+
 	/// Get a reference to the machine.
 	pub fn machine(&self) -> &Machine {
 		&self.machine
