@@ -6,6 +6,8 @@ use crate::{ExitError, ExitFatal};
 /// A sequencial memory. It uses Rust's `Vec` for internal
 /// representation.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Memory {
 	data: Vec<u8>,
 	effective_len: U256,

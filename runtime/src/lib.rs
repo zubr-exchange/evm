@@ -76,11 +76,15 @@ macro_rules! step {
 /// EVM runtime.
 ///
 /// The runtime wraps an EVM `Machine` with support of return data and context.
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Runtime<'config> {
 	machine: Machine,
 	status: Result<(), ExitReason>,
 	return_data_buffer: Vec<u8>,
 	context: Context,
+	#[serde(skip)]
+	#[serde(default = "Config::default")]
 	_config: &'config Config,
 }
 
@@ -210,6 +214,9 @@ pub struct Config {
 	pub has_ext_code_hash: bool,
 }
 
+
+const DEFAULT_CONFIG: Config = Config::istanbul();
+
 impl Config {
 	/// Frontier hard fork configuration.
 	pub const fn frontier() -> Config {
@@ -289,5 +296,10 @@ impl Config {
 			has_self_balance: true,
 			has_ext_code_hash: true,
 		}
+	}
+
+	/// Reference to default configuration
+	pub fn default() -> &'static Config {
+		&DEFAULT_CONFIG
 	}
 }
