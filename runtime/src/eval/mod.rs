@@ -2,6 +2,7 @@
 mod macros;
 mod system;
 
+pub use system::return_value_to_memory;
 use crate::{Handler, Runtime, ExitReason, ExternalOpcode, CallScheme};
 
 pub enum Control<H: Handler> {

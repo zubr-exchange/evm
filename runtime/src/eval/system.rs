@@ -418,8 +418,62 @@ pub fn call<'config, H: Handler>(
 			}
 		},
 		Capture::Trap(interrupt) => {
-			push!(runtime, H256::default());
+			// push!(runtime, H256::default());
+			push_u256!(runtime, out_offset);
+			push_u256!(runtime, out_len);
 			Control::CallInterrupt(interrupt)
+		},
+	}
+}
+
+/// save return_value into parent runtime
+pub fn return_value_to_memory<'config, H: Handler>(
+	runtime: &mut Runtime,
+	reason : ExitReason,
+	return_data : Vec<u8>,
+	_handler: & H
+	) -> Control<H> {
+
+	runtime.return_data_buffer = Vec::new();
+	pop_u256!(runtime, out_len, out_offset);
+	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
+
+	runtime.return_data_buffer = return_data;
+	let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
+	match reason {
+		ExitReason::Succeed(_) => {
+			match runtime.machine.memory_mut().copy_large(
+				out_offset,
+				U256::zero(),
+				target_len,
+				&runtime.return_data_buffer[..],
+			) {
+				Ok(()) => {
+					push_u256!(runtime, U256::one());
+				},
+				Err(_) => {
+					push_u256!(runtime, U256::zero());
+				},
+			}
+			Control::Continue
+		},
+		ExitReason::Revert(_) => {
+			push_u256!(runtime, U256::zero());
+			let _ = runtime.machine.memory_mut().copy_large(
+				out_offset,
+				U256::zero(),
+				target_len,
+				&runtime.return_data_buffer[..],
+			);
+			Control::Continue
+		},
+		ExitReason::Error(_) => {
+			push_u256!(runtime, U256::zero());
+			Control::Continue
+		},
+		ExitReason::Fatal(e) => {
+			push_u256!(runtime, U256::zero());
+			Control::Exit(e.into())
 		},
 	}
 }
