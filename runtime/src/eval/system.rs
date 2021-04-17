@@ -266,7 +266,7 @@ pub fn create<H: Handler>(
 		}
 	};
 
-	match handler.create(runtime.context.address, scheme, value, &code, None) {
+	match handler.create(runtime.context.address, scheme, value, code, None) {
 		Capture::Exit((reason, address, return_data)) => {
 			runtime.return_data_buffer = return_data;
 			let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
