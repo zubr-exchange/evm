@@ -29,6 +29,8 @@ use primitive_types::U256;
 use crate::eval::{eval, Control};
 
 /// Core execution layer for EVM.
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Machine {
 	/// Program data.
 	data: Rc<Vec<u8>>,

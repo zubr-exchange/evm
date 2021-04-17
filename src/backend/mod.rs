@@ -29,6 +29,8 @@ pub type Bytes = alloc::vec::Vec<u8>;
 
 /// Log info from contract
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Log {
         /// address
 	pub address: H160,
