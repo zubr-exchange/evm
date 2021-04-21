@@ -322,10 +322,11 @@ pub fn call<'config, H: Handler>(
 		},
 	};
 
-	pop_u256!(runtime, in_offset, in_len, out_offset, out_len);
-
+	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
+	// this parameters will be read in save_return_value()
+	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
-	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
+	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
 	let input = if in_len == U256::zero() {
 		Vec::new()
@@ -372,70 +373,24 @@ pub fn call<'config, H: Handler>(
 
 	match handler.call(to.into(), transfer, input, gas, scheme == CallScheme::StaticCall, context) {
 		Capture::Exit((reason, return_data)) => {
-			runtime.return_data_buffer = return_data;
-			let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
-
-			match reason {
-				ExitReason::Succeed(_) => {
-					match runtime.machine.memory_mut().copy_large(
-						out_offset,
-						U256::zero(),
-						target_len,
-						&runtime.return_data_buffer[..],
-					) {
-						Ok(()) => {
-							push_u256!(runtime, U256::one());
-							Control::Continue
-						},
-						Err(_) => {
-							push_u256!(runtime, U256::zero());
-							Control::Continue
-						},
-					}
-				},
-				ExitReason::Revert(_) => {
-					push_u256!(runtime, U256::zero());
-
-					let _ = runtime.machine.memory_mut().copy_large(
-						out_offset,
-						U256::zero(),
-						target_len,
-						&runtime.return_data_buffer[..],
-					);
-
-					Control::Continue
-				},
-				ExitReason::Error(_) => {
-					push_u256!(runtime, U256::zero());
-
-					Control::Continue
-				},
-				ExitReason::Fatal(e) => {
-					push_u256!(runtime, U256::zero());
-
-					Control::Exit(e.into())
-				},
-			}
+			return save_return_value(runtime, reason, return_data, handler);
 		},
 		Capture::Trap(interrupt) => {
 			// push!(runtime, H256::default());
-			push_u256!(runtime, out_offset);
-			push_u256!(runtime, out_len);
 			Control::CallInterrupt(interrupt)
 		},
 	}
 }
 
 /// save return_value into parent runtime
-pub fn return_value_to_memory<'config, H: Handler>(
+pub fn save_return_value<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
 	return_data : Vec<u8>,
 	_handler: & H
 	) -> Control<H> {
 
-	runtime.return_data_buffer = Vec::new();
-	pop_u256!(runtime, out_len, out_offset);
+	pop_u256!(runtime, out_offset, out_len);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
 	runtime.return_data_buffer = return_data;
@@ -450,12 +405,13 @@ pub fn return_value_to_memory<'config, H: Handler>(
 			) {
 				Ok(()) => {
 					push_u256!(runtime, U256::one());
+					Control::Continue
 				},
 				Err(_) => {
 					push_u256!(runtime, U256::zero());
+					Control::Continue
 				},
 			}
-			Control::Continue
 		},
 		ExitReason::Revert(_) => {
 			push_u256!(runtime, U256::zero());

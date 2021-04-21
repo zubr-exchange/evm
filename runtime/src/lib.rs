@@ -17,7 +17,7 @@ pub use evm_core::*;
 pub use crate::context::{CreateScheme, CallScheme, Context};
 pub use crate::interrupt::{Resolve, ResolveCall, ResolveCreate};
 pub use crate::handler::{Transfer, Handler};
-pub use crate::eval::return_value_to_memory;
+pub use crate::eval::save_return_value;
 
 use alloc::vec::Vec;
 use alloc::rc::Rc;
