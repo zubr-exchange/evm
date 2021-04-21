@@ -36,6 +36,8 @@ pub enum CallScheme {
 
 /// Context of the runtime.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Context {
 	/// Execution address.
 	pub address: H160,

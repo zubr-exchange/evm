@@ -4,6 +4,8 @@ use crate::ExitError;
 
 /// EVM stack.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Stack {
 	data: Vec<H256>,
 	limit: usize,
