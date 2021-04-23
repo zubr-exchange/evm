@@ -268,7 +268,7 @@ pub fn create<H: Handler>(
 
 	match handler.create(runtime.context.address, scheme, value, code, None) {
 		Capture::Exit((reason, address, return_data)) => {
-			create_result_save(runtime, reason, address, return_data, handler)
+			save_created_address(runtime, reason, address, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
 			// push!(runtime, H256::default());
@@ -303,7 +303,7 @@ pub fn call<'config, H: Handler>(
 	};
 
 	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
-	// this parameters will be read in call_result_save()
+	// this parameters will be read in save_return_value()
 	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
 	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
@@ -353,7 +353,7 @@ pub fn call<'config, H: Handler>(
 
 	match handler.call(to.into(), transfer, input, gas, scheme == CallScheme::StaticCall, context) {
 		Capture::Exit((reason, return_data)) => {
-			return call_result_save(runtime, reason, return_data, handler);
+			return save_return_value(runtime, reason, return_data, handler);
 		},
 		Capture::Trap(interrupt) => {
 			// push!(runtime, H256::default());
@@ -362,8 +362,8 @@ pub fn call<'config, H: Handler>(
 	}
 }
 
-/// save return value of create opcode into parent runtime
-pub fn create_result_save<'config, H: Handler>(
+/// save created contract address into parent runtime
+pub fn save_created_address<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
 	address: Option<H160>,
@@ -394,9 +394,8 @@ pub fn create_result_save<'config, H: Handler>(
 
 }
 
-
 /// save return_value of call opcode into parent runtime
-pub fn call_result_save<'config, H: Handler>(
+pub fn save_return_value<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
 	return_data : Vec<u8>,

@@ -17,12 +17,10 @@ pub use evm_core::*;
 pub use crate::context::{CreateScheme, CallScheme, Context};
 pub use crate::interrupt::{Resolve, ResolveCall, ResolveCreate};
 pub use crate::handler::{Transfer, Handler};
-pub use crate::eval::{call_result_save, create_result_save};
+pub use crate::eval::{save_return_value, save_created_address};
 
 use alloc::vec::Vec;
 use alloc::rc::Rc;
-use primitive_types::{H160};
-
 
 macro_rules! step {
 	( $self:expr, $handler:expr, $return:tt $($err:path)?; $($ok:path)? ) => ({
@@ -89,8 +87,6 @@ pub struct Runtime<'config> {
 	#[serde(skip)]
 	#[serde(default = "Config::default")]
 	_config: &'config Config,
-	external_opcode :Option<ExternalOpcode>,
-	external_opcode_address: Option<H160>
 }
 
 impl<'config> Runtime<'config> {
@@ -107,8 +103,6 @@ impl<'config> Runtime<'config> {
 			return_data_buffer: Vec::new(),
 			context,
 			_config: config,
-			external_opcode: None,
-			external_opcode_address: None
 		}
 	}
 
@@ -143,25 +137,6 @@ impl<'config> Runtime<'config> {
 		loop {
 			step!(self, handler, return;)
 		}
-	}
-
-	/// set external opcode for which this runtime was created
-	pub fn set_external_opcode(&mut self, opcode: Option<ExternalOpcode>){
-		self.external_opcode = opcode;
-	}
-
-	/// get external opcode for which this runtime was created
-	pub fn get_external_opcode(&self) -> Option<ExternalOpcode>{
-		return self.external_opcode;
-	}
-	/// set address thas was calculated  for create opcode
-	pub fn set_external_opcode_address(&mut self, address: Option<H160>){
-		self.external_opcode_address = address;
-	}
-
-	/// get address thas was calculated  for create opcode
-	pub fn get_external_opcode_address(&self) -> Option<H160>{
-		return self.external_opcode_address;
 	}
 }
 
