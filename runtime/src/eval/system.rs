@@ -322,10 +322,11 @@ pub fn call<'config, H: Handler>(
 		},
 	};
 
-	pop_u256!(runtime, in_offset, in_len, out_offset, out_len);
-
+	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
+	// out_offset and out_len parameters will be read in save_return_value()
+	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
-	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
+	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
 	let input = if in_len == U256::zero() {
 		Vec::new()
@@ -372,6 +373,27 @@ pub fn call<'config, H: Handler>(
 
 	match handler.call(to.into(), transfer, input, gas, scheme == CallScheme::StaticCall, context) {
 		Capture::Exit((reason, return_data)) => {
+			save_return_value(runtime, reason, return_data, handler)
+		},
+		Capture::Trap(interrupt) => {
+			// push!(runtime, H256::default());
+			Control::CallInterrupt(interrupt)
+		},
+	}
+}
+
+/// save return_value into parent runtime
+pub fn save_return_value<'config, H: Handler>(
+	runtime: &mut Runtime,
+	reason : ExitReason,
+	return_data : Vec<u8>,
+	_handler: & H
+	) -> Control<H> {
+
+	pop_u256!(runtime, out_offset, out_len);
+	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
+
+        {  // this block uses the given alignment to match the original code.
 			runtime.return_data_buffer = return_data;
 			let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
 
@@ -416,10 +438,5 @@ pub fn call<'config, H: Handler>(
 					Control::Exit(e.into())
 				},
 			}
-		},
-		Capture::Trap(interrupt) => {
-			push!(runtime, H256::default());
-			Control::CallInterrupt(interrupt)
-		},
-	}
+        }
 }
