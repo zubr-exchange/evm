@@ -303,7 +303,7 @@ pub fn call<'config, H: Handler>(
 	};
 
 	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
-	// this parameters will be read in save_return_value()
+	// out_offset and out_len parameters will be read in save_return_value()
 	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
 	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
@@ -353,7 +353,7 @@ pub fn call<'config, H: Handler>(
 
 	match handler.call(to.into(), transfer, input, gas, scheme == CallScheme::StaticCall, context) {
 		Capture::Exit((reason, return_data)) => {
-			return save_return_value(runtime, reason, return_data, handler);
+			save_return_value(runtime, reason, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
 			// push!(runtime, H256::default());
@@ -394,7 +394,7 @@ pub fn save_created_address<'config, H: Handler>(
 
 }
 
-/// save return_value of call opcode into parent runtime
+/// save return_value into parent runtime
 pub fn save_return_value<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
@@ -405,43 +405,50 @@ pub fn save_return_value<'config, H: Handler>(
 	pop_u256!(runtime, out_offset, out_len);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
-	runtime.return_data_buffer = return_data;
-	let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
-	match reason {
-		ExitReason::Succeed(_) => {
-			match runtime.machine.memory_mut().copy_large(
-				out_offset,
-				U256::zero(),
-				target_len,
-				&runtime.return_data_buffer[..],
-			) {
-				Ok(()) => {
-					push_u256!(runtime, U256::one());
+        {  // this block uses the given alignment to match the original code.
+			runtime.return_data_buffer = return_data;
+			let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
+
+			match reason {
+				ExitReason::Succeed(_) => {
+					match runtime.machine.memory_mut().copy_large(
+						out_offset,
+						U256::zero(),
+						target_len,
+						&runtime.return_data_buffer[..],
+					) {
+						Ok(()) => {
+							push_u256!(runtime, U256::one());
+							Control::Continue
+						},
+						Err(_) => {
+							push_u256!(runtime, U256::zero());
+							Control::Continue
+						},
+					}
+				},
+				ExitReason::Revert(_) => {
+					push_u256!(runtime, U256::zero());
+
+					let _ = runtime.machine.memory_mut().copy_large(
+						out_offset,
+						U256::zero(),
+						target_len,
+						&runtime.return_data_buffer[..],
+					);
+
 					Control::Continue
 				},
-				Err(_) => {
+				ExitReason::Error(_) => {
 					push_u256!(runtime, U256::zero());
+
 					Control::Continue
+				},
+				ExitReason::Fatal(e) => {
+					push_u256!(runtime, U256::zero());
+
+					Control::Exit(e.into())
 				},
 			}
-		},
-		ExitReason::Revert(_) => {
-			push_u256!(runtime, U256::zero());
-			let _ = runtime.machine.memory_mut().copy_large(
-				out_offset,
-				U256::zero(),
-				target_len,
-				&runtime.return_data_buffer[..],
-			);
-			Control::Continue
-		},
-		ExitReason::Error(_) => {
-			push_u256!(runtime, U256::zero());
-			Control::Continue
-		},
-		ExitReason::Fatal(e) => {
-			push_u256!(runtime, U256::zero());
-			Control::Exit(e.into())
-		},
-	}
+        }
 }

@@ -258,8 +258,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	#[must_use]
 	pub fn deconstruct(
 		self
-	) -> (impl IntoIterator<Item=Apply<impl IntoIterator<Item=(H256, H256)>>>,
-		  impl IntoIterator<Item=Log>)
+	) -> (Vec::<Apply<BTreeMap<H256, H256>>>, Vec<Log>)
 	{
 		let mut applies = Vec::<Apply<BTreeMap<H256, H256>>>::new();
 
