@@ -1,6 +1,6 @@
 use core::cmp::min;
 use alloc::vec::Vec;
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use sha3::{Keccak256, Digest};
 use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
 			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal};
@@ -268,30 +268,10 @@ pub fn create<H: Handler>(
 
 	match handler.create(runtime.context.address, scheme, value, code, None) {
 		Capture::Exit((reason, address, return_data)) => {
-			runtime.return_data_buffer = return_data;
-			let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
-
-			match reason {
-				ExitReason::Succeed(_) => {
-					push!(runtime, create_address.into());
-					Control::Continue
-				},
-				ExitReason::Revert(_) => {
-					push!(runtime, H256::default());
-					Control::Continue
-				},
-				ExitReason::Error(_) => {
-					push!(runtime, H256::default());
-					Control::Continue
-				},
-				ExitReason::Fatal(e) => {
-					push!(runtime, H256::default());
-					Control::Exit(e.into())
-				},
-			}
+			create_result_save(runtime, reason, address, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
-			push!(runtime, H256::default());
+			// push!(runtime, H256::default());
 			Control::CreateInterrupt(interrupt)
 		},
 	}
@@ -323,7 +303,7 @@ pub fn call<'config, H: Handler>(
 	};
 
 	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
-	// this parameters will be read in save_return_value()
+	// this parameters will be read in call_result_save()
 	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
 	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
@@ -373,7 +353,7 @@ pub fn call<'config, H: Handler>(
 
 	match handler.call(to.into(), transfer, input, gas, scheme == CallScheme::StaticCall, context) {
 		Capture::Exit((reason, return_data)) => {
-			return save_return_value(runtime, reason, return_data, handler);
+			return call_result_save(runtime, reason, return_data, handler);
 		},
 		Capture::Trap(interrupt) => {
 			// push!(runtime, H256::default());
@@ -382,8 +362,41 @@ pub fn call<'config, H: Handler>(
 	}
 }
 
-/// save return_value into parent runtime
-pub fn save_return_value<'config, H: Handler>(
+/// save return value of create opcode into parent runtime
+pub fn create_result_save<'config, H: Handler>(
+	runtime: &mut Runtime,
+	reason : ExitReason,
+	address: Option<H160>,
+	return_data : Vec<u8>,
+	_handler: & H
+) -> Control<H> {
+	runtime.return_data_buffer = return_data;
+	let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
+
+	match reason {
+		ExitReason::Succeed(_) => {
+			push!(runtime, create_address.into());
+			Control::Continue
+		},
+		ExitReason::Revert(_) => {
+			push!(runtime, H256::default());
+			Control::Continue
+		},
+		ExitReason::Error(_) => {
+			push!(runtime, H256::default());
+			Control::Continue
+		},
+		ExitReason::Fatal(e) => {
+			push!(runtime, H256::default());
+			Control::Exit(e.into())
+		},
+	}
+
+}
+
+
+/// save return_value of call opcode into parent runtime
+pub fn call_result_save<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
 	return_data : Vec<u8>,

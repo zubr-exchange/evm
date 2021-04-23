@@ -2,7 +2,7 @@
 mod macros;
 mod system;
 
-pub use system::save_return_value;
+pub use system::{call_result_save, create_result_save};
 use crate::{Handler, Runtime, ExitReason, ExternalOpcode, CallScheme};
 
 pub enum Control<H: Handler> {
