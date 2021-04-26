@@ -271,6 +271,7 @@ pub fn create<H: Handler>(
 			save_created_address(runtime, reason, address, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
+			// The created contract's address will be push by the method save_created_address()
 			// push!(runtime, H256::default());
 			Control::CreateInterrupt(interrupt)
 		},
@@ -356,6 +357,7 @@ pub fn call<'config, H: Handler>(
 			save_return_value(runtime, reason, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
+			// The result of the call opcode will be push by the method save_return_value()
 			// push!(runtime, H256::default());
 			Control::CallInterrupt(interrupt)
 		},
