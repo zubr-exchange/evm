@@ -1,6 +1,6 @@
 use core::cmp::min;
 use alloc::vec::Vec;
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use sha3::{Keccak256, Digest};
 use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
 			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal};
@@ -268,30 +268,11 @@ pub fn create<H: Handler>(
 
 	match handler.create(runtime.context.address, scheme, value, &code, None) {
 		Capture::Exit((reason, address, return_data)) => {
-			runtime.return_data_buffer = return_data;
-			let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
-
-			match reason {
-				ExitReason::Succeed(_) => {
-					push!(runtime, create_address.into());
-					Control::Continue
-				},
-				ExitReason::Revert(_) => {
-					push!(runtime, H256::default());
-					Control::Continue
-				},
-				ExitReason::Error(_) => {
-					push!(runtime, H256::default());
-					Control::Continue
-				},
-				ExitReason::Fatal(e) => {
-					push!(runtime, H256::default());
-					Control::Exit(e.into())
-				},
-			}
+			save_created_address(runtime, reason, address, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
-			push!(runtime, H256::default());
+			// The created contract's address will be push by the method save_created_address()
+			// push!(runtime, H256::default());
 			Control::CreateInterrupt(interrupt)
 		},
 	}
@@ -376,10 +357,43 @@ pub fn call<'config, H: Handler>(
 			save_return_value(runtime, reason, return_data, handler)
 		},
 		Capture::Trap(interrupt) => {
+			// The result of the call opcode will be push by the method save_return_value()
 			// push!(runtime, H256::default());
 			Control::CallInterrupt(interrupt)
 		},
 	}
+}
+
+/// save created contract address into parent runtime
+pub fn save_created_address<'config, H: Handler>(
+	runtime: &mut Runtime,
+	reason : ExitReason,
+	address: Option<H160>,
+	return_data : Vec<u8>,
+	_handler: & H
+) -> Control<H> {
+	runtime.return_data_buffer = return_data;
+	let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
+
+	match reason {
+		ExitReason::Succeed(_) => {
+			push!(runtime, create_address.into());
+			Control::Continue
+		},
+		ExitReason::Revert(_) => {
+			push!(runtime, H256::default());
+			Control::Continue
+		},
+		ExitReason::Error(_) => {
+			push!(runtime, H256::default());
+			Control::Continue
+		},
+		ExitReason::Fatal(e) => {
+			push!(runtime, H256::default());
+			Control::Exit(e.into())
+		},
+	}
+
 }
 
 /// save return_value into parent runtime

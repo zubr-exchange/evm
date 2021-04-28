@@ -2,13 +2,18 @@
 mod macros;
 mod system;
 
-pub use system::save_return_value;
+pub use system::{save_return_value, save_created_address};
 use crate::{Handler, Runtime, ExitReason, ExternalOpcode, CallScheme};
 
+/// ...
 pub enum Control<H: Handler> {
+	/// ...
 	Continue,
+	/// ...
 	CallInterrupt(H::CallInterrupt),
+	/// ...
 	CreateInterrupt(H::CreateInterrupt),
+	/// ...
 	Exit(ExitReason)
 }
 
