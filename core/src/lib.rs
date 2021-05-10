@@ -24,7 +24,6 @@ pub use crate::error::{Trap, Capture, ExitReason, ExitSucceed, ExitError, ExitRe
 
 use core::ops::Range;
 use alloc::vec::Vec;
-use alloc::rc::Rc;
 use primitive_types::U256;
 use crate::eval::{eval, Control};
 
@@ -34,10 +33,10 @@ use crate::eval::{eval, Control};
 pub struct Machine {
 	/// Program data.
 	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
-	data: Rc<Vec<u8>>,
+	data: Vec<u8>,
 	/// Program code.
 	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
-	code: Rc<Vec<u8>>,
+	code: Vec<u8>,
 	/// Program counter.
 	position: Result<usize, ExitReason>,
 	/// Return value.
@@ -62,8 +61,8 @@ impl Machine {
 
 	/// Create a new machine with given code and data.
 	pub fn new(
-		code: Rc<Vec<u8>>,
-		data: Rc<Vec<u8>>,
+		code: Vec<u8>,
+		data: Vec<u8>,
 		stack_limit: usize,
 		memory_limit: usize
 	) -> Self {

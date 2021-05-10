@@ -266,7 +266,7 @@ pub fn create<H: Handler>(
 		}
 	};
 
-	match handler.create(runtime.context.address, scheme, value, &code, None) {
+	match handler.create(runtime.context.address, scheme, value, code, None) {
 		Capture::Exit((reason, address, return_data)) => {
 			save_created_address(runtime, reason, address, return_data, handler)
 		},

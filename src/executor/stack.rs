@@ -1,6 +1,5 @@
 use core::convert::Infallible;
 use core::cmp::min;
-use alloc::rc::Rc;
 use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
 use primitive_types::{U256, H256, H160};
@@ -152,7 +151,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		&mut self,
 		caller: H160,
 		value: U256,
-		init_code: &Vec<u8>,
+		init_code: Vec<u8>,
 		gas_limit: usize,
 	) -> ExitReason {
 //		let transaction_cost = gasometer::create_transaction_cost(&init_code);
@@ -179,7 +178,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		&mut self,
 		caller: H160,
 		value: U256,
-		init_code: &Vec<u8>,
+		init_code: Vec<u8>,
 		salt: H256,
 		gas_limit: usize,
 	) -> ExitReason {
@@ -188,7 +187,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 //			Ok(()) => (),
 //			Err(e) => return e.into(),
 //		}
-		let code_hash = keccak256_digest(init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
+		let code_hash = keccak256_digest(&init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
 
 		match self.create_inner(
 			caller,
@@ -356,7 +355,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		caller: H160,
 		scheme: CreateScheme,
 		value: U256,
-		init_code: &Vec<u8>,
+		init_code: Vec<u8>,
 		target_gas: Option<usize>,
 		take_l64: bool,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Infallible> {
@@ -445,8 +444,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 
 		let mut runtime = Runtime::new(
-			Rc::new(init_code.to_vec()),
-			Rc::new(Vec::new()),
+			init_code,
+			Vec::new(),
 			context,
 			self.config,
 		);
@@ -599,8 +598,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 
 		let mut runtime = Runtime::new(
-			Rc::new(code),
-			Rc::new(input),
+			code,
+			input,
 			context,
 			self.config,
 		);
@@ -768,7 +767,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		caller: H160,
 		scheme: CreateScheme,
 		value: U256,
-		init_code: &Vec<u8>,
+		init_code: Vec<u8>,
 		target_gas: Option<usize>,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Self::CreateInterrupt> {
 		self.create_inner(caller, scheme, value, init_code, target_gas, true)
