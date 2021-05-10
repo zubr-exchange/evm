@@ -33,8 +33,10 @@ use crate::eval::{eval, Control};
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Machine {
 	/// Program data.
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	data: Rc<Vec<u8>>,
 	/// Program code.
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	code: Rc<Vec<u8>>,
 	/// Program counter.
 	position: Result<usize, ExitReason>,

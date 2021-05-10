@@ -5,19 +5,22 @@ use crate::Opcode;
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Valids(Vec<bool>);
+pub struct Valids{
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
+	data: Vec<u8>
+}
 
 impl Valids {
 	/// Create a new valid mapping from given code bytes.
 	pub fn new(code: &[u8]) -> Self {
-		let mut valids: Vec<bool> = Vec::with_capacity(code.len());
-		valids.resize(code.len(), false);
+		let mut valids: Vec<u8> = Vec::with_capacity(code.len());
+		valids.resize(code.len(), 0u8);
 
 		let mut i = 0;
 		while i < code.len() {
 			match Opcode::parse(code[i]) {
 				Ok(Opcode::JumpDest) => {
-					valids[i] = true;
+					valids[i] = 1u8;
 					i += 1;
 				}
 				Ok(Opcode::Push(v)) => {
@@ -29,14 +32,14 @@ impl Valids {
 			}
 		}
 
-		Valids(valids)
+		Valids{ data: valids }
 	}
 
 	/// Get the length of the valid mapping. This is the same as the
 	/// code bytes.
 	#[inline]
 	pub fn len(&self) -> usize {
-		self.0.len()
+		self.data.len()
 	}
 
 	/// Returns true if the valids list is empty
@@ -48,11 +51,11 @@ impl Valids {
 	/// Returns `true` if the position is a valid jump destination. If
 	/// not, returns `false`.
 	pub fn is_valid(&self, position: usize) -> bool {
-		if position >= self.0.len() {
+		if position >= self.data.len() {
 			return false;
 		}
 
-		if !self.0[position] {
+		if self.data[position] == 0 {
 			return false;
 		}
 

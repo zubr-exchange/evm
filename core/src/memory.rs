@@ -9,6 +9,7 @@ use crate::{ExitError, ExitFatal};
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Memory {
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	data: Vec<u8>,
 	effective_len: U256,
 	limit: usize,

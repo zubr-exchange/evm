@@ -82,10 +82,11 @@ macro_rules! step {
 pub struct Runtime<'config> {
 	machine: Machine,
 	status: Result<(), ExitReason>,
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	return_data_buffer: Vec<u8>,
 	context: Context,
-	#[serde(skip)]
-	#[serde(default = "Config::default")]
+	#[cfg_attr(feature = "with-serde", serde(skip))]
+	#[cfg_attr(feature = "with-serde", serde(default = "Config::default"))]
 	_config: &'config Config,
 }
 
