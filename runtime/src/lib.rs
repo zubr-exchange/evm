@@ -20,7 +20,6 @@ pub use crate::handler::{Transfer, Handler};
 pub use crate::eval::{save_return_value, save_created_address, Control};
 
 use alloc::vec::Vec;
-use alloc::rc::Rc;
 
 macro_rules! step {
 	( $self:expr, $handler:expr, $return:tt $($err:path)?; $($ok:path)? ) => ({
@@ -82,18 +81,19 @@ macro_rules! step {
 pub struct Runtime<'config> {
 	machine: Machine,
 	status: Result<(), ExitReason>,
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	return_data_buffer: Vec<u8>,
 	context: Context,
-	#[serde(skip)]
-	#[serde(default = "Config::default")]
+	#[cfg_attr(feature = "with-serde", serde(skip))]
+	#[cfg_attr(feature = "with-serde", serde(default = "Config::default"))]
 	_config: &'config Config,
 }
 
 impl<'config> Runtime<'config> {
 	/// Create a new runtime with given code and data.
 	pub fn new(
-		code: Rc<Vec<u8>>,
-		data: Rc<Vec<u8>>,
+		code: Vec<u8>,
+		data: Vec<u8>,
 		context: Context,
 		config: &'config Config,
 	) -> Self {
