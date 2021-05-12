@@ -15,7 +15,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"], opti
 
 [features]
 default = ["std"]
-with-serde = ["serde"]
+with-serde = ["serde", "evm-core/with-serde"]
 std = [
   "evm-core/std",
   "evm-runtime/std",

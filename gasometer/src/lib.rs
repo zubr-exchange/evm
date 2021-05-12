@@ -18,7 +18,8 @@ mod utils;
 
 use evm_core::{ExitError, Opcode, Stack, H160, H256, U256};
 use evm_runtime::{CONFIG, Handler};
-use serde::{Serialize, Deserialize};
+
+pub mod tracing;
 
 macro_rules! try_or_fail {
 	( $inner:expr, $e:expr ) => (
@@ -34,7 +35,7 @@ macro_rules! try_or_fail {
 
 /// EVM gasometer.
 #[derive(Clone)]
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Gasometer {
 	gas_limit: u64,
 	inner: Result<Inner, ExitError>
@@ -112,6 +113,8 @@ impl Gasometer {
 		&mut self,
 		cost: u64
 	) -> Result<(), ExitError> {
+		tracing::Event::RecordCost(cost).emit();
+
 		let all_gas_cost = self.total_used_gas() + cost;
 		if self.gas_limit < all_gas_cost {
 			self.inner = Err(ExitError::OutOfGas);
@@ -127,6 +130,8 @@ impl Gasometer {
 		&mut self,
 		refund: i64,
 	) -> Result<(), ExitError> {
+		tracing::Event::RecordRefund(refund).emit();
+
 		self.inner_mut()?.refunded_gas += refund;
 		Ok(())
 	}
@@ -157,6 +162,8 @@ impl Gasometer {
 		let gas_refund = self.inner_mut()?.gas_refund(cost.clone());
 		let used_gas = self.inner_mut()?.used_gas;
 
+		tracing::Event::RecordDynamicCost {gas_cost, memory_gas, gas_refund}.emit();
+
 		let all_gas_cost = memory_gas + used_gas + gas_cost;
 		if self.gas_limit < all_gas_cost {
 			self.inner = Err(ExitError::OutOfGas);
@@ -178,6 +185,8 @@ impl Gasometer {
 		&mut self,
 		stipend: u64,
 	) -> Result<(), ExitError> {
+		tracing::Event::RecordStipend(stipend).emit();
+
 		self.inner_mut()?.used_gas -= stipend;
 		Ok(())
 	}
@@ -199,6 +208,8 @@ impl Gasometer {
 					non_zero_data_len as u64 * CONFIG.gas_transaction_non_zero_data
 			},
 		};
+
+		tracing::Event::RecordTransaction(gas_cost).emit();
 
 		if self.gas() < gas_cost {
 			self.inner = Err(ExitError::OutOfGas);
@@ -531,7 +542,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 }
 
 #[derive(Clone)]
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 struct Inner {
 	memory_cost: u64,
 	used_gas: u64,
