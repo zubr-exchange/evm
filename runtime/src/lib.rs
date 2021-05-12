@@ -55,7 +55,11 @@ macro_rules! step {
 			},
 		}
 
-		match $self.machine.step() {
+		let result = $self.machine.step();
+
+		tracing::Event::StepResult(&result).emit();
+
+		match result {
 			Ok(()) => $($ok)?(()),
 			Err(Capture::Exit(e)) => {
 				$self.status = Err(e.clone());
