@@ -8,15 +8,16 @@
 	clippy::missing_errors_doc,
 	clippy::missing_panics_doc
 )]
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
+
 
 mod eval;
 mod context;
 mod interrupt;
 mod handler;
+pub mod tracing;
 
 pub use evm_core::*;
 
@@ -30,6 +31,13 @@ use alloc::vec::Vec;
 macro_rules! step {
 	( $self:expr, $handler:expr, $return:tt $($err:path)?; $($ok:path)? ) => ({
 		if let Some((opcode, stack)) = $self.machine.inspect() {
+			tracing::Event::Step {
+				context: &$self.context,
+				opcode,
+				stack,
+				memory: $self.machine.memory()
+			}.emit();
+			
 			match $handler.pre_validate(&$self.context, opcode, stack) {
 				Ok(()) => (),
 				Err(e) => {
