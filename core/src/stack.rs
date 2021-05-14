@@ -2,12 +2,59 @@ use primitive_types::{H256, U256};
 use alloc::vec::Vec;
 use crate::ExitError;
 
+#[cfg(feature = "with-serde")]
+mod serde_vec_u256 {
+	use serde::{Serializer, Deserializer, de};
+	use primitive_types::U256;
+	use alloc::{fmt, vec::Vec};
+
+	pub fn serialize<S: Serializer>(data: &Vec<U256>, serializer: S) -> Result<S::Ok, S::Error>
+	{
+		let (prefix, bytes, sufix) = unsafe { data.align_to::<u8>() };
+		assert_eq!(prefix.len(), 0);
+		assert_eq!(sufix.len(), 0);
+		
+		serializer.serialize_bytes(bytes)
+	}
+
+	pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<U256>, D::Error> {
+		struct Visitor;
+
+		impl<'de> de::Visitor<'de> for Visitor {
+			type Value = Vec<U256>;
+
+			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+				formatter.write_str("Vec<U256>")
+			}
+
+			fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E>
+			{
+				if v.len() % 32 != 0 {
+					return Err(E::custom("unexpected slice len"));
+				}
+
+				let mut data: Vec<U256> = Vec::with_capacity( (v.len() / 32) + 32 );
+				unsafe {
+					let ptr = data.as_mut_ptr().cast::<u8>();
+					ptr.copy_from_nonoverlapping(v.as_ptr(), v.len());
+
+					data.set_len(v.len() / 32);
+				}
+
+				Ok(data)
+			}
+		}
+
+		deserializer.deserialize_bytes(Visitor)
+	}
+}
+
 /// EVM stack.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Stack {
-	
+	#[cfg_attr(feature = "with-serde", serde(with="serde_vec_u256"))]
 	data: Vec<U256>,
 	limit: usize,
 }
