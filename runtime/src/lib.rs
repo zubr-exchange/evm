@@ -92,7 +92,7 @@ pub struct Runtime<'config> {
 impl<'config> Runtime<'config> {
 	/// Create a new runtime with given code and data.
 	pub fn new(
-		code: Vec<u8>,
+		code: Code,
 		data: Vec<u8>,
 		context: Context,
 		config: &'config Config,
@@ -104,6 +104,16 @@ impl<'config> Runtime<'config> {
 			context,
 			_config: config,
 		}
+	}
+
+	/// Restore code data
+	pub fn finalize_restore<H: Handler>(&mut self, handler: &H) {
+		let code_account = match self.machine.code() {
+			Code::AccountRef{ptr: _, len: _, account} => *account,
+			_ => return
+		};
+
+		*self.machine.code_mut() = handler.code(code_account);
 	}
 
 	/// Get return data
