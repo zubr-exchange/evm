@@ -114,7 +114,10 @@ impl Gasometer {
 		&mut self,
 		cost: u64
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordCost(cost).emit();
+		tracing::Event::RecordCost {
+			cost,
+			snapshot: self.snapshot()?,
+		}.emit();
 
 		let all_gas_cost = self.total_used_gas() + cost;
 		if self.gas_limit < all_gas_cost {
@@ -131,7 +134,10 @@ impl Gasometer {
 		&mut self,
 		refund: i64,
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordRefund(refund).emit();
+		tracing::Event::RecordRefund {
+			refund,			
+			snapshot: self.snapshot()?,
+		}.emit();
 
 		self.inner_mut()?.refunded_gas += refund;
 		Ok(())
@@ -163,7 +169,12 @@ impl Gasometer {
 		let gas_refund = self.inner_mut()?.gas_refund(cost.clone());
 		let used_gas = self.inner_mut()?.used_gas;
 
-		tracing::Event::RecordDynamicCost {gas_cost, memory_gas, gas_refund}.emit();
+		tracing::Event::RecordDynamicCost {
+			gas_cost,
+			memory_gas,
+			gas_refund, 
+			snapshot: self.snapshot()?,
+		}.emit();
 
 		let all_gas_cost = memory_gas + used_gas + gas_cost;
 		if self.gas_limit < all_gas_cost {
@@ -186,7 +197,10 @@ impl Gasometer {
 		&mut self,
 		stipend: u64,
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordStipend(stipend).emit();
+		tracing::Event::RecordStipend {
+			stipend,
+			snapshot: self.snapshot()?,
+		}.emit();
 
 		self.inner_mut()?.used_gas -= stipend;
 		Ok(())
@@ -210,7 +224,10 @@ impl Gasometer {
 			},
 		};
 
-		tracing::Event::RecordTransaction(gas_cost).emit();
+		tracing::Event::RecordTransaction {
+			cost: gas_cost,
+			snapshot: self.snapshot()?,
+		}.emit();
 
 		if self.gas() < gas_cost {
 			self.inner = Err(ExitError::OutOfGas);
@@ -219,6 +236,16 @@ impl Gasometer {
 
 		self.inner_mut()?.used_gas += gas_cost;
 		Ok(())
+	}
+
+	fn snapshot(&self) -> Result<tracing::Snapshot, ExitError> {
+		let inner = self.inner.as_ref().map_err(|e| e.clone())?;
+		Ok(tracing::Snapshot {
+			gas_limit: self.gas_limit,
+			memory_gas: inner.memory_gas,
+			used_gas: inner.used_gas,
+			refunded_gas: inner.refunded_gas,
+		})
 	}
 }
 
