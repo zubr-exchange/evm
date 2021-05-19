@@ -19,7 +19,7 @@ pub enum Control<H: Handler> {
 
 pub fn eval<H: Handler>(state: &mut Runtime, opcode: ExternalOpcode, handler: &mut H) -> Control<H> {
 	match opcode {
-		ExternalOpcode::Sha3 => system::sha3(state),
+		ExternalOpcode::Sha3 => system::sha3(state, handler),
 		ExternalOpcode::Address => system::address(state),
 		ExternalOpcode::Balance => system::balance(state, handler),
 		ExternalOpcode::SelfBalance => system::selfbalance(state, handler),

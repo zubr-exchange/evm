@@ -1,16 +1,11 @@
 use core::cmp::min;
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
-use sha3::{Keccak256, Digest};
 use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
 			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal};
 use super::Control;
 
-fn keccak256_digest(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(&data).as_slice())
-}
-
-pub fn sha3<H: Handler>(runtime: &mut Runtime) -> Control<H> {
+pub fn sha3<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	pop_u256!(runtime, from, len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(from, len));
@@ -23,7 +18,7 @@ pub fn sha3<H: Handler>(runtime: &mut Runtime) -> Control<H> {
 		runtime.machine.memory_mut().get(from, len)
 	};
 
-	let ret = keccak256_digest(data.as_slice()); //Keccak256::digest(data.as_slice());
+	let ret = handler.keccak256_h256(data.as_slice()); //Keccak256::digest(data.as_slice());
 	push!(runtime, ret); //H256::from_slice(ret.as_slice()));
 
 	Control::Continue
@@ -254,7 +249,7 @@ pub fn create<H: Handler>(
 	let scheme = if is_create2 {
 		pop!(runtime, salt);
 		//let code_hash = H256::from_slice(Keccak256_digest(&code)); //Keccak256::digest(&code).as_slice());
-                let code_hash = keccak256_digest(&code);
+		let code_hash = handler.keccak256_h256(&code);
 		CreateScheme::Create2 {
 			caller: runtime.context.address,
 			salt,
