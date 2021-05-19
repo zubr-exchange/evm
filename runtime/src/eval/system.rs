@@ -1,6 +1,6 @@
 use core::cmp::min;
 use alloc::vec::Vec;
-use crate::{tracing, Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
+use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
 			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal,
 			H160, H256, U256};
 use super::Control;
@@ -180,11 +180,11 @@ pub fn sload<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	let value = handler.storage(runtime.context.address, index);
 	push_u256!(runtime, value);
 
-	tracing::Event::SLoad {
+	event!(SLoad {
 		address: runtime.context.address,
 		index,
 		value
-	}.emit();
+	});
 
 	Control::Continue
 }
@@ -192,11 +192,11 @@ pub fn sload<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 pub fn sstore<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> {
 	pop_u256!(runtime, index, value);
 
-	tracing::Event::SStore {
+	event!(SStore {
 		address: runtime.context.address,
 		index,
 		value
-	}.emit();
+	});
 
 	match handler.set_storage(runtime.context.address, index, value) {
 		Ok(()) => Control::Continue,
