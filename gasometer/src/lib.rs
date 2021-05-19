@@ -12,6 +12,22 @@
 #![cfg_attr(not(feature = "tracing"), forbid(unused_imports))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "tracing")]
+pub mod tracing;
+
+#[cfg(feature = "tracing")]
+macro_rules! event {
+	($x:expr) => {
+		use crate::tracing::Event::*;
+		$x.emit();
+	}
+}
+
+#[cfg(not(feature = "tracing"))]
+macro_rules! event {
+	($x:expr) => { }
+}
+
 mod consts;
 mod costs;
 mod memory;
@@ -19,8 +35,6 @@ mod utils;
 
 use evm_core::{ExitError, Opcode, Stack, H160, H256, U256};
 use evm_runtime::{CONFIG, Handler};
-
-pub mod tracing;
 
 macro_rules! try_or_fail {
 	( $inner:expr, $e:expr ) => (
@@ -32,6 +46,14 @@ macro_rules! try_or_fail {
 			},
 		}
 	)
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Snapshot {
+    pub gas_limit: u64,
+    pub memory_gas: u64,
+	pub used_gas: u64,
+	pub refunded_gas: i64,
 }
 
 /// EVM gasometer.
@@ -114,10 +136,10 @@ impl Gasometer {
 		&mut self,
 		cost: u64
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordCost {
+		event!(RecordCost {
 			cost,
 			snapshot: self.snapshot()?,
-		}.emit();
+		});
 
 		let all_gas_cost = self.total_used_gas() + cost;
 		if self.gas_limit < all_gas_cost {
@@ -134,10 +156,10 @@ impl Gasometer {
 		&mut self,
 		refund: i64,
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordRefund {
+		event!(RecordRefund {
 			refund,			
 			snapshot: self.snapshot()?,
-		}.emit();
+		});
 
 		self.inner_mut()?.refunded_gas += refund;
 		Ok(())
@@ -169,12 +191,12 @@ impl Gasometer {
 		let gas_refund = self.inner_mut()?.gas_refund(cost.clone());
 		let used_gas = self.inner_mut()?.used_gas;
 
-		tracing::Event::RecordDynamicCost {
+		event!(RecordDynamicCost {
 			gas_cost,
 			memory_gas,
 			gas_refund, 
 			snapshot: self.snapshot()?,
-		}.emit();
+		});
 
 		let all_gas_cost = memory_gas + used_gas + gas_cost;
 		if self.gas_limit < all_gas_cost {
@@ -197,10 +219,10 @@ impl Gasometer {
 		&mut self,
 		stipend: u64,
 	) -> Result<(), ExitError> {
-		tracing::Event::RecordStipend {
+		event!(RecordStipend {
 			stipend,
 			snapshot: self.snapshot()?,
-		}.emit();
+		});
 
 		self.inner_mut()?.used_gas -= stipend;
 		Ok(())
@@ -224,10 +246,10 @@ impl Gasometer {
 			},
 		};
 
-		tracing::Event::RecordTransaction {
+		event!(RecordTransaction {
 			cost: gas_cost,
 			snapshot: self.snapshot()?,
-		}.emit();
+		});
 
 		if self.gas() < gas_cost {
 			self.inner = Err(ExitError::OutOfGas);
@@ -238,11 +260,11 @@ impl Gasometer {
 		Ok(())
 	}
 
-	fn snapshot(&self) -> Result<tracing::Snapshot, ExitError> {
+	pub fn snapshot(&self) -> Result<Snapshot, ExitError> {
 		let inner = self.inner.as_ref().map_err(|e| e.clone())?;
-		Ok(tracing::Snapshot {
+		Ok(Snapshot {
 			gas_limit: self.gas_limit,
-			memory_gas: inner.memory_gas,
+			memory_gas: inner.memory_cost,
 			used_gas: inner.used_gas,
 			refunded_gas: inner.refunded_gas,
 		})
