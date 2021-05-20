@@ -97,7 +97,7 @@ pub trait Backend {
 	/// Get account code.
 	fn code(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
-	fn storage(&self, address: H160, index: H256) -> H256;
+	fn storage(&self, address: H160, index: U256) -> U256;
 
 	/// Notification about create new address
 	fn create(&self, scheme: &CreateScheme, address: &H160);
@@ -124,6 +124,6 @@ pub trait ApplyBackend {
 		delete_empty: bool,
 	) where
 		A: IntoIterator<Item=Apply<I>>,
-		I: IntoIterator<Item=(H256, H256)>,
+		I: IntoIterator<Item=(U256, U256)>,
 		L: IntoIterator<Item=Log>;
 }

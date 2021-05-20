@@ -64,7 +64,7 @@ pub fn calldatacopy(state: &mut Machine) -> Control {
 }
 
 pub fn pop(state: &mut Machine) -> Control {
-	pop!(state, _val);
+	pop_u256!(state, _val);
 	trace_op!("Pop  [@{}]: {}", state.stack.len(), val);
 	Control::Continue(1)
 }
@@ -154,33 +154,21 @@ pub fn push(state: &mut Machine, n: usize, position: usize) -> Control {
 }
 
 pub fn dup(state: &mut Machine, n: usize) -> Control {
-	let value = match state.stack.peek(n - 1) {
-		Ok(value) => value,
-		Err(e) => return Control::Exit(e.into()),
+	if let Err(e) = state.stack.dup(n - 1) {
+		return Control::Exit(e.into());
 	};
-	trace_op!("Dup{} [@{}]: {}", n, state.stack.len(), value);
-	push!(state, value);
+
+	trace_op!("Dup{} [@{}]", n, state.stack.len());
+
 	Control::Continue(1)
 }
 
 pub fn swap(state: &mut Machine, n: usize) -> Control {
-	let val1 = match state.stack.peek(0) {
-		Ok(value) => value,
-		Err(e) => return Control::Exit(e.into()),
+	if let Err(e) = state.stack.swap(n) {
+		return Control::Exit(e.into());
 	};
-	let val2 = match state.stack.peek(n) {
-		Ok(value) => value,
-		Err(e) => return Control::Exit(e.into()),
-	};
-	match state.stack.set(0, val2) {
-		Ok(()) => (),
-		Err(e) => return Control::Exit(e.into()),
-	}
-	match state.stack.set(n, val1) {
-		Ok(()) => (),
-		Err(e) => return Control::Exit(e.into()),
-	}
-	trace_op!("Swap [@0:@{}]: {}, {}", n, val1, val2);
+
+	trace_op!("Swap [@0:@{}]", n);
 	Control::Continue(1)
 }
 

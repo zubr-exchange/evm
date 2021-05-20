@@ -21,7 +21,7 @@ pub struct StackAccount {
 	/// Code. `None` means the code is currently unknown.
 	pub code: Option<Vec<u8>>,
 	/// Storage. Not inserted values mean it is currently known, but not empty.
-	pub storage: BTreeMap<H256, H256>,
+	pub storage: BTreeMap<U256, U256>,
 	/// Whether the storage in the database should be reset before storage
 	/// values are applied.
 	pub reset_storage: bool,
@@ -257,9 +257,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	#[must_use]
 	pub fn deconstruct(
 		self
-	) -> (Vec::<Apply<BTreeMap<H256, H256>>>, Vec<Log>)
+	) -> (Vec::<Apply<BTreeMap<U256, U256>>>, Vec<Log>)
 	{
-		let mut applies = Vec::<Apply<BTreeMap<H256, H256>>>::new();
+		let mut applies = Vec::<Apply<BTreeMap<U256, U256>>>::new();
 
 		for (address, account) in self.state {
 			if self.deleted.contains(&address) {
@@ -678,13 +678,13 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		}).unwrap_or(self.backend.code(address))
 	}
 
-	fn storage(&self, address: H160, index: H256) -> H256 {
+	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
 			.and_then(|v| {
 				let s = v.storage.get(&index).cloned();
 
 				if v.reset_storage {
-					Some(s.unwrap_or(H256::default()))
+					Some(s.unwrap_or(U256::zero()))
 				} else {
 					s
 				}
@@ -693,10 +693,10 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 			.unwrap_or(self.backend.storage(address, index))
 	}
 
-	fn original_storage(&self, address: H160, index: H256) -> H256 {
+	fn original_storage(&self, address: H160, index: U256) -> U256 {
 		if let Some(account) = self.state.get(&address) {
 			if account.reset_storage {
-				return H256::default()
+				return U256::zero()
 			}
 		}
 		self.backend.storage(address, index)
@@ -733,7 +733,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 	fn deleted(&self, address: H160) -> bool { self.deleted.contains(&address) }
 
-	fn set_storage(&mut self, address: H160, index: H256, value: H256) -> Result<(), ExitError> {
+	fn set_storage(&mut self, address: H160, index: U256, value: U256) -> Result<(), ExitError> {
 		self.account_mut(address).storage.insert(index, value);
 
 		Ok(())

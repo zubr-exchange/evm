@@ -5,7 +5,7 @@ mod bitwise;
 mod misc;
 
 use core::ops::{BitAnd, BitOr, BitXor};
-use primitive_types::{H256, U256};
+use primitive_types::U256;
 use crate::{ExitReason, ExitSucceed, ExitError, Machine, Opcode};
 
 pub enum Control {

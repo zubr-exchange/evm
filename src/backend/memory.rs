@@ -46,7 +46,7 @@ pub struct MemoryAccount {
 	/// Account balance.
 	pub balance: U256,
 	/// Full account storage.
-	pub storage: BTreeMap<H256, H256>,
+	pub storage: BTreeMap<U256, U256>,
 	/// Account code.
 	pub code: Vec<u8>,
 }
@@ -122,10 +122,10 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		self.state.get(&address).map(|v| v.code.clone()).unwrap_or_default()
 	}
 
-	fn storage(&self, address: H160, index: H256) -> H256 {
+	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
-			.map(|v| v.storage.get(&index).cloned().unwrap_or(H256::default()))
-			.unwrap_or(H256::default())
+			.map(|v| v.storage.get(&index).cloned().unwrap_or(U256::zero()))
+			.unwrap_or(U256::zero())
 	}
 
 	fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
@@ -151,7 +151,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 		delete_empty: bool,
 	) where
 		A: IntoIterator<Item=Apply<I>>,
-		I: IntoIterator<Item=(H256, H256)>,
+		I: IntoIterator<Item=(U256, U256)>,
 		L: IntoIterator<Item=Log>,
 	{
 		for apply in values {
@@ -172,16 +172,16 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 						}
 
 						let zeros = account.storage.iter()
-							.filter(|(_, v)| v == &&H256::default())
+							.filter(|(_, v)| v == &&U256::zero())
 							.map(|(k, _)| k.clone())
-							.collect::<Vec<H256>>();
+							.collect::<Vec<U256>>();
 
 						for zero in zeros {
 							account.storage.remove(&zero);
 						}
 
 						for (index, value) in storage {
-							if value == H256::default() {
+							if value == U256::zero() {
 								account.storage.remove(&index);
 							} else {
 								account.storage.insert(index, value);
