@@ -24,7 +24,6 @@ pub use crate::error::{Trap, Capture, ExitReason, ExitSucceed, ExitError, ExitRe
 
 use core::ops::Range;
 use alloc::vec::Vec;
-use primitive_types::U256;
 use crate::eval::{eval, Control};
 
 /// Core execution layer for EVM.
@@ -40,7 +39,7 @@ pub struct Machine {
 	/// Program counter.
 	position: Result<usize, ExitReason>,
 	/// Return value.
-	return_range: Range<U256>,
+	return_range: Range<usize>,
 	/// Code validity maps.
 	valids: Valids,
 	/// Memory.
@@ -72,7 +71,7 @@ impl Machine {
 			data,
 			code,
 			position: Ok(0),
-			return_range: U256::zero()..U256::zero(),
+			return_range: 0..0,
 			valids,
 			memory: Memory::new(memory_limit),
 			stack: Stack::new(stack_limit),
@@ -95,25 +94,10 @@ impl Machine {
 
 	/// Copy and get the return value of the machine, if any.
 	pub fn return_value(&self) -> Vec<u8> {
-		if self.return_range.start > U256::from(usize::max_value()) {
-			let mut ret = Vec::new();
-			ret.resize((self.return_range.end - self.return_range.start).as_usize(), 0);
-			ret
-		} else if self.return_range.end > U256::from(usize::max_value()) {
-			let mut ret = self.memory.get(
-				self.return_range.start.as_usize(),
-				usize::max_value() - self.return_range.start.as_usize(),
-			);
-			while ret.len() < (self.return_range.end - self.return_range.start).as_usize() {
-				ret.push(0);
-			}
-			ret
-		} else {
-			self.memory.get(
-				self.return_range.start.as_usize(),
-				(self.return_range.end - self.return_range.start).as_usize(),
-			)
-		}
+		self.memory.get(
+			self.return_range.start,
+			self.return_range.end - self.return_range.start,
+		)
 	}
 
 	/// Loop stepping the machine, until it stops.
