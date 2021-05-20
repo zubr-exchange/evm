@@ -25,6 +25,9 @@ pub trait Handler {
 	/// Feedback value of `CALL` interrupt.
 	type CallFeedback;
 
+	/// Get keccak hash from data.
+	fn keccak256_h256(&self, data: &[u8]) -> H256;
+
 	/// Get balance of address.
 	fn balance(&self, address: H160) -> U256;
 	/// Get code size of address.

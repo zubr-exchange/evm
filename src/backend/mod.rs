@@ -112,6 +112,12 @@ pub trait Backend {
 		take_l64: bool,
 		take_stipend: bool,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>>;
+
+	/// Get keccak hash from slice
+	fn keccak256_h256(&self, data: &[u8]) -> H256;
+
+	/// Get keccak hash from array of slices
+	fn keccak256_h256_v(&self, data: &[&[u8]]) -> H256;
 }
 
 /// EVM backend that can apply changes.
