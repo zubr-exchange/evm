@@ -14,6 +14,10 @@ pub fn codecopy(state: &mut Machine) -> Control {
 	pop_u256!(state, memory_offset, code_offset, len);
 	trace_op!("CodeCopy: {}", len);
 
+	let memory_offset = as_usize_or_fail!(memory_offset);
+	let code_offset = as_usize_or_fail!(code_offset);
+	let len = as_usize_or_fail!(len);
+
 	try_or_fail!(state.memory.resize_offset(memory_offset, len));
 	match state.memory.copy_large(memory_offset, code_offset, len, &state.code) {
 		Ok(()) => Control::Continue(1),
@@ -52,11 +56,15 @@ pub fn calldatacopy(state: &mut Machine) -> Control {
 	pop_u256!(state, memory_offset, data_offset, len);
 	trace_op!("CallDataCopy: {}", len);
 
-	try_or_fail!(state.memory.resize_offset(memory_offset, len));
-	if len == U256::zero() {
+	let memory_offset = as_usize_or_fail!(memory_offset);
+	let data_offset = as_usize_or_fail!(data_offset);
+	let len = as_usize_or_fail!(len);
+
+	if len == 0 {
 		return Control::Continue(1)
 	}
 
+	try_or_fail!(state.memory.resize_offset(memory_offset, len));
 	match state.memory.copy_large(memory_offset, data_offset, len, &state.data) {
 		Ok(()) => Control::Continue(1),
 		Err(e) => Control::Exit(e.into()),
@@ -72,8 +80,8 @@ pub fn pop(state: &mut Machine) -> Control {
 pub fn mload(state: &mut Machine) -> Control {
 	pop_u256!(state, index);
 	trace_op!("MLoad: {}", index);
-	try_or_fail!(state.memory.resize_offset(index, U256::from(32)));
 	let index = as_usize_or_fail!(index);
+	try_or_fail!(state.memory.resize_offset(index, 32));
 	let value = H256::from_slice(&state.memory.get(index, 32)[..]);
 	push!(state, value);
 	Control::Continue(1)
@@ -83,8 +91,8 @@ pub fn mstore(state: &mut Machine) -> Control {
 	pop_u256!(state, index);
 	pop!(state, value);
 	trace_op!("MStore: {}, {}", index, value);
-	try_or_fail!(state.memory.resize_offset(index, U256::from(32)));
 	let index = as_usize_or_fail!(index);
+	try_or_fail!(state.memory.resize_offset(index, 32));
 	match state.memory.set(index, &value[..], Some(32)) {
 		Ok(()) => Control::Continue(1),
 		Err(e) => Control::Exit(e.into()),
@@ -94,8 +102,8 @@ pub fn mstore(state: &mut Machine) -> Control {
 pub fn mstore8(state: &mut Machine) -> Control {
 	pop_u256!(state, index, value);
 	trace_op!("MStore8: {}, {}", index, value);
-	try_or_fail!(state.memory.resize_offset(index, U256::one()));
 	let index = as_usize_or_fail!(index);
+	try_or_fail!(state.memory.resize_offset(index, 1));
 	let value = (value.low_u32() & 0xff) as u8;
 	match state.memory.set(index, &[value], Some(1)) {
 		Ok(()) => Control::Continue(1),
@@ -175,6 +183,8 @@ pub fn swap(state: &mut Machine, n: usize) -> Control {
 pub fn ret(state: &mut Machine) -> Control {
 	trace_op!("Return");
 	pop_u256!(state, start, len);
+	let start = as_usize_or_fail!(start);
+	let len = as_usize_or_fail!(len);
 	try_or_fail!(state.memory.resize_offset(start, len));
 	state.return_range = start..(start + len);
 	Control::Exit(ExitSucceed::Returned.into())
@@ -183,6 +193,8 @@ pub fn ret(state: &mut Machine) -> Control {
 pub fn revert(state: &mut Machine) -> Control {
 	trace_op!("Revert");
 	pop_u256!(state, start, len);
+	let start = as_usize_or_fail!(start);
+	let len = as_usize_or_fail!(len);
 	try_or_fail!(state.memory.resize_offset(start, len));
 	state.return_range = start..(start + len);
 	Control::Exit(ExitRevert::Reverted.into())
