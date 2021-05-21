@@ -239,15 +239,6 @@ impl Opcode {
 }
 
 impl Opcode {
-	/// Whether the opcode is a push opcode.
-	pub fn is_push(&self) -> Option<u8> {
-		let value = self.0;
-		if value >= 0x60 && value <= 0x7f {
-			Some(value - 0x60 + 1)
-		} else {
-			None
-		}
-	}
 
 	#[inline]
 	pub const fn as_u8(&self) -> u8 {
