@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
 use crate::{Capture, Stack, ExitError, Opcode,
-			CreateScheme, Context, Machine, ExitReason};
+			CreateScheme, Context, Machine, ExitReason, Code};
 
 /// Transfer from source to target, with given value.
 #[derive(Clone, Debug)]
@@ -35,7 +35,7 @@ pub trait Handler {
 	/// Get code hash of address.
 	fn code_hash(&self, address: H160) -> H256;
 	/// Get code of address.
-	fn code(&self, address: H160) -> Vec<u8>;
+	fn code(&self, address: H160) -> Code;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: U256) -> U256;
 	/// Get original storage value of address at index.

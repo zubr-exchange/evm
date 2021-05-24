@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 use core::convert::Infallible;
 use primitive_types::{H160, H256, U256};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, ExitReason};
+use crate::{Capture, Transfer, ExitReason, Code};
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -95,7 +95,7 @@ pub trait Backend {
 	/// Get account code size.
 	fn code_size(&self, address: H160) -> usize;
 	/// Get account code.
-	fn code(&self, address: H160) -> Vec<u8>;
+	fn code(&self, address: H160) -> Code;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: U256) -> U256;
 
