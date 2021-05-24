@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
-use crate::{Capture, Stack, ExitError, Opcode, ExternalOpcode,
+use crate::{Capture, Stack, ExitError, Opcode,
 			CreateScheme, Context, Machine, ExitReason, Code};
 
 /// Transfer from source to target, with given value.
@@ -24,6 +24,9 @@ pub trait Handler {
 	type CallInterrupt;
 	/// Feedback value of `CALL` interrupt.
 	type CallFeedback;
+
+	/// Get keccak hash from data.
+	fn keccak256_h256(&self, data: &[u8]) -> H256;
 
 	/// Get balance of address.
 	fn balance(&self, address: H160) -> U256;
@@ -108,13 +111,13 @@ pub trait Handler {
 	fn pre_validate(
 		&mut self,
 		context: &Context,
-		opcode: Result<Opcode, ExternalOpcode>,
+		opcode: Opcode,
 		stack: &Stack
 	) -> Result<(), ExitError>;
 	/// Handle other unknown external opcodes.
 	fn other(
 		&mut self,
-		_opcode: u8,
+		_opcode: Opcode,
 		_stack: &mut Machine
 	) -> Result<(), ExitError> {
 		Err(ExitError::OutOfGas)

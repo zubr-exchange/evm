@@ -1,29 +1,23 @@
 use core::cmp::min;
 use alloc::vec::Vec;
 use primitive_types::{H160, H256, U256};
-use sha3::{Keccak256, Digest};
 use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
 			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal};
 use super::Control;
 
-fn keccak256_digest(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(&data).as_slice())
-}
-
-pub fn sha3<H: Handler>(runtime: &mut Runtime) -> Control<H> {
+pub fn sha3<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 	pop_u256!(runtime, from, len);
+	let from = as_usize_or_fail!(from);
+	let len = as_usize_or_fail!(len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(from, len));
-	let data = if len == U256::zero() {
+	let data = if len == 0 {
 		Vec::new()
 	} else {
-		let from = as_usize_or_fail!(from);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory_mut().get(from, len)
 	};
 
-	let ret = keccak256_digest(data.as_slice()); //Keccak256::digest(data.as_slice());
+	let ret = handler.keccak256_h256(data.as_slice()); //Keccak256::digest(data.as_slice());
 	push!(runtime, ret); //H256::from_slice(ret.as_slice()));
 
 	Control::Continue
@@ -103,6 +97,10 @@ pub fn extcodecopy<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H>
 	pop!(runtime, address);
 	pop_u256!(runtime, memory_offset, code_offset, len);
 
+	let memory_offset = as_usize_or_fail!(memory_offset);
+	let code_offset = as_usize_or_fail!(code_offset);
+	let len = as_usize_or_fail!(len);
+
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(memory_offset, len));
 	match runtime.machine.memory_mut().copy_large(
 		memory_offset,
@@ -127,9 +125,13 @@ pub fn returndatasize<H: Handler>(runtime: &mut Runtime) -> Control<H> {
 pub fn returndatacopy<H: Handler>(runtime: &mut Runtime) -> Control<H> {
 	pop_u256!(runtime, memory_offset, data_offset, len);
 
+	let memory_offset = as_usize_or_fail!(memory_offset);
+	let data_offset = as_usize_or_fail!(data_offset);
+	let len = as_usize_or_fail!(len);
+
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(memory_offset, len));
 	if data_offset.checked_add(len)
-		.map(|l| l > U256::from(runtime.return_data_buffer.len()))
+		.map(|l| l > runtime.return_data_buffer.len())
 		.unwrap_or(true)
 	{
 		return Control::Exit(ExitError::OutOfOffset.into())
@@ -196,14 +198,13 @@ pub fn gas<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
 
 pub fn log<H: Handler>(runtime: &mut Runtime, n: u8, handler: &mut H) -> Control<H> {
 	pop_u256!(runtime, offset, len);
+	let offset = as_usize_or_fail!(offset);
+	let len = as_usize_or_fail!(len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(offset, len));
-	let data = if len == U256::zero() {
+	let data = if len == 0 {
 		Vec::new()
 	} else {
-		let offset = as_usize_or_fail!(offset);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory().get(offset, len)
 	};
 
@@ -240,21 +241,20 @@ pub fn create<H: Handler>(
 	runtime.return_data_buffer = Vec::new();
 
 	pop_u256!(runtime, value, code_offset, len);
+	let code_offset = as_usize_or_fail!(code_offset);
+	let len = as_usize_or_fail!(len);
 
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(code_offset, len));
-	let code = if len == U256::zero() {
+	let code = if len == 0 {
 		Vec::new()
 	} else {
-		let code_offset = as_usize_or_fail!(code_offset);
-		let len = as_usize_or_fail!(len);
-
 		runtime.machine.memory().get(code_offset, len)
 	};
 
 	let scheme = if is_create2 {
 		pop!(runtime, salt);
 		//let code_hash = H256::from_slice(Keccak256_digest(&code)); //Keccak256::digest(&code).as_slice());
-                let code_hash = keccak256_digest(&code);
+		let code_hash = handler.keccak256_h256(&code);
 		CreateScheme::Create2 {
 			caller: runtime.context.address,
 			salt,
@@ -306,15 +306,15 @@ pub fn call<'config, H: Handler>(
 	// https://app.zenhub.com/workspaces/solana-evm-6007c75a9dc141001100ccb8/issues/cyber-core/solana-program-library/132
 	// out_offset and out_len parameters will be read in save_return_value()
 	pop_u256!(runtime, in_offset, in_len/*, out_offset, out_len*/);
+	let in_offset = as_usize_or_fail!(in_offset);
+	let in_len = as_usize_or_fail!(in_len);
+	
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(in_offset, in_len));
 	// try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
-	let input = if in_len == U256::zero() {
+	let input = if in_len == 0 {
 		Vec::new()
 	} else {
-		let in_offset = as_usize_or_fail!(in_offset);
-		let in_len = as_usize_or_fail!(in_len);
-
 		runtime.machine.memory().get(in_offset, in_len)
 	};
 
@@ -405,17 +405,20 @@ pub fn save_return_value<'config, H: Handler>(
 	) -> Control<H> {
 
 	pop_u256!(runtime, out_offset, out_len);
+	let out_offset = as_usize_or_fail!(out_offset);
+	let out_len = as_usize_or_fail!(out_len);
+
 	try_or_fail!(runtime.machine.memory_mut().resize_offset(out_offset, out_len));
 
         {  // this block uses the given alignment to match the original code.
 			runtime.return_data_buffer = return_data;
-			let target_len = min(out_len, U256::from(runtime.return_data_buffer.len()));
+			let target_len = min(out_len, runtime.return_data_buffer.len());
 
 			match reason {
 				ExitReason::Succeed(_) => {
 					match runtime.machine.memory_mut().copy_large(
 						out_offset,
-						U256::zero(),
+						0,
 						target_len,
 						&runtime.return_data_buffer[..],
 					) {
@@ -434,7 +437,7 @@ pub fn save_return_value<'config, H: Handler>(
 
 					let _ = runtime.machine.memory_mut().copy_large(
 						out_offset,
-						U256::zero(),
+						0,
 						target_len,
 						&runtime.return_data_buffer[..],
 					);

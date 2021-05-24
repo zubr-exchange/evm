@@ -1,4 +1,3 @@
-use primitive_types::U256;
 use core::cmp::{min, max};
 use alloc::vec::Vec;
 use crate::{ExitError, ExitFatal};
@@ -11,7 +10,7 @@ use crate::{ExitError, ExitFatal};
 pub struct Memory {
 	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	data: Vec<u8>,
-	effective_len: U256,
+	effective_len: usize,
 	limit: usize,
 }
 
@@ -20,7 +19,7 @@ impl Memory {
 	pub fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
-			effective_len: U256::zero(),
+			effective_len: 0usize,
 			limit,
 		}
 	}
@@ -36,7 +35,7 @@ impl Memory {
 	}
 
 	/// Get the effective length.
-	pub fn effective_len(&self) -> U256 {
+	pub fn effective_len(&self) -> usize {
 		self.effective_len
 	}
 
@@ -48,8 +47,8 @@ impl Memory {
 	/// Resize the memory, making it cover the memory region of `offset..(offset
 	/// + len)`, with 32 bytes as the step. If the length is zero, this function
 	/// does nothing.
-	pub fn resize_offset(&mut self, offset: U256, len: U256) -> Result<(), ExitError> {
-		if len == U256::zero() {
+	pub fn resize_offset(&mut self, offset: usize, len: usize) -> Result<(), ExitError> {
+		if len == 0 {
 			return Ok(())
 		}
 
@@ -61,13 +60,20 @@ impl Memory {
 	}
 
 	/// Resize the memory, making it cover to `end`, with 32 bytes as the step.
-	pub fn resize_end(&mut self, mut end: U256) -> Result<(), ExitError> {
-		while end % U256::from(32) != U256::zero() {
-			end = match end.checked_add(U256::one()) {
-				Some(end) => end,
-				None => return Err(ExitError::InvalidRange)
-			};
-		}
+	pub fn resize_end(&mut self, end: usize) -> Result<(), ExitError> {
+		let end = {
+			let modulo = end % 32;
+			if modulo == 0 {
+				end
+			} else {
+				// next closest value to `end` that is divisible by 32
+				// end = (end + 32) - (end % 32)
+				match end.checked_add(32) {
+					Some(end) => end - modulo,
+					None => return Err(ExitError::InvalidRange)
+				}
+			}
+		};
 
 		self.effective_len = max(self.effective_len, end);
 		Ok(())
@@ -80,17 +86,18 @@ impl Memory {
 	/// Value of `size` is considered trusted. If they're too large,
 	/// the program can run out of memory, or it can overflow.
 	pub fn get(&self, offset: usize, size: usize) -> Vec<u8> {
-		let mut ret = Vec::new();
+		let mut ret = Vec::with_capacity(size);
 		ret.resize(size, 0);
 
-		for index in 0..size {
-			let position = offset + index;
-			if position >= self.data.len() {
-				break
-			}
-
-			ret[index] = self.data[position];
+		if offset >= self.data.len() {
+			return ret;
 		}
+		let end = match offset.checked_add(size) {
+			Some(end) => min(end, self.data.len()),
+			None => return ret
+		};
+
+		(&mut ret[0..(end - offset)]).copy_from_slice(&self.data[offset..end]);
 
 		ret
 	}
@@ -115,13 +122,11 @@ impl Memory {
 			self.data.resize(offset + target_size, 0);
 		}
 
-		for index in 0..target_size {
-			if self.data.len() > offset + index && value.len() > index {
-				self.data[offset + index] = value[index];
-			} else {
-				self.data[offset + index] = 0;
-			}
-		}
+		let data = &mut self.data[offset..(offset + target_size)];
+		let value_size = min(value.len(), target_size);
+		let (d1, d2) = data.split_at_mut(value_size);
+		d1.copy_from_slice(&value[0..value_size]);
+		d2.fill(0);
 
 		Ok(())
 	}
@@ -129,40 +134,21 @@ impl Memory {
 	/// Copy `data` into the memory, of given `len`.
 	pub fn copy_large(
 		&mut self,
-		memory_offset: U256,
-		data_offset: U256,
-		len: U256,
+		memory_offset: usize,
+		data_offset: usize,
+		len: usize,
 		data: &[u8]
 	) -> Result<(), ExitFatal> {
-		let memory_offset = if memory_offset > U256::from(usize::max_value()) {
-			return Err(ExitFatal::NotSupported)
-		} else {
-			memory_offset.as_usize()
-		};
-
-		let ulen = if len > U256::from(usize::max_value()) {
-			return Err(ExitFatal::NotSupported)
-		} else {
-			len.as_usize()
-		};
-
 		let data = if let Some(end) = data_offset.checked_add(len) {
-			if end > U256::from(usize::max_value()) {
+			if data_offset > data.len() {
 				&[]
 			} else {
-				let data_offset = data_offset.as_usize();
-				let end = end.as_usize();
-
-				if data_offset > data.len() {
-					&[]
-				} else {
-					&data[data_offset..min(end, data.len())]
-				}
+				&data[data_offset..min(end, data.len())]
 			}
 		} else {
 			&[]
 		};
 
-		self.set(memory_offset, data, Some(ulen))
+		self.set(memory_offset, data, Some(len))
 	}
 }

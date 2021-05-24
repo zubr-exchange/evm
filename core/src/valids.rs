@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use crate::Opcode;
 
 /// Mapping of valid jump destination from code.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -18,18 +17,18 @@ impl Valids {
 
 		let mut i = 0;
 		while i < code.len() {
-			match Opcode::parse(code[i]) {
-				Ok(Opcode::JumpDest) => {
+			let opcode = code[i];
+			match opcode {
+				0x5b => { // Jump Dest
 					valids[i] = 1u8;
-					i += 1;
-				}
-				Ok(Opcode::Push(v)) => {
-					i += v as usize + 1;
-				}
-				_ => {
-					i += 1;
-				}
+				},
+				0x60..=0x7f => { // Push
+					i += (opcode as usize) - 0x60 + 1;
+				},
+				_ => {}
 			}
+
+			i += 1;
 		}
 
 		Valids{ data: valids }

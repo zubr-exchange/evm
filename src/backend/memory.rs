@@ -7,10 +7,6 @@ use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
 use crate::{Capture, Transfer, ExitReason, Code};
 
-fn keccak256_digest(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(&data).as_slice())
-}
-
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
@@ -108,10 +104,10 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn code_hash(&self, address: H160) -> H256 {
 		self.state.get(&address).map(|v| {
-                        keccak256_digest(&v.code)
+			self.keccak256_h256(&v.code)
 			//H256::from_slice(Keccak256::digest(&v.code).as_slice())
 		//}).unwrap_or(H256::from_slice(Keccak256::digest(&[]).as_slice()))
-                }).unwrap_or(keccak256_digest(&[]))
+                }).unwrap_or(self.keccak256_h256(&[]))
 	}
 
 	fn code_size(&self, address: H160) -> usize {
@@ -140,6 +136,18 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_take_stipend: bool,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
 		return None;
+	}
+
+	fn keccak256_h256(&self, data: &[u8]) -> H256 {
+		H256::from_slice(Keccak256::digest(&data).as_slice())
+	}
+
+	fn keccak256_h256_v(&self, data: &[&[u8]]) -> H256 {
+		let mut hasher = Keccak256::new();
+		for some_slice in data {
+			hasher.input(&some_slice);
+		}
+		H256::from_slice(hasher.result().as_slice())
 	}
 }
 

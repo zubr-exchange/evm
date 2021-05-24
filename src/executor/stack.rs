@@ -3,15 +3,10 @@ use core::cmp::min;
 use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
 use primitive_types::{U256, H256, H160};
-use sha3::{Keccak256, Digest};
-use crate::{ExitError, Stack, ExternalOpcode, Opcode, Capture, Handler, Transfer,
+use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer,
 			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config, Code};
 use crate::backend::{Log, Basic, Apply, Backend};
 //use crate::gasometer::{self, Gasometer};
-
-fn keccak256_digest(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(&data).as_slice())
-}
 
 /// Account definition for the stack-based executor.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
@@ -187,7 +182,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 //			Ok(()) => (),
 //			Err(e) => return e.into(),
 //		}
-		let code_hash = keccak256_digest(&init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
+		let code_hash = self.backend.keccak256_h256(&init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
 
 		match self.create_inner(
 			caller,
@@ -329,12 +324,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	pub fn create_address(&self, scheme: CreateScheme) -> H160 {
 		match scheme {
 			CreateScheme::Create2 { caller, code_hash, salt } => {
-				let mut hasher = Keccak256::new();
-				hasher.input(&[0xff]);
-				hasher.input(&caller[..]);
-				hasher.input(&salt[..]);
-				hasher.input(&code_hash[..]);
-				H256::from_slice(hasher.result().as_slice()).into()
+				self.backend.keccak256_h256_v(&[&[0xff], &caller[..], &salt[..], &code_hash[..]]).into()
 			},
 			CreateScheme::Legacy { caller } => {
 				let nonce = self.nonce(caller);
@@ -342,7 +332,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				stream.append(&caller);
 				stream.append(&nonce);
 				//H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
-                                keccak256_digest(&stream.out()).into()
+				self.backend.keccak256_h256(&stream.out()).into()
 			},
 			CreateScheme::Fixed(naddress) => {
 				naddress
@@ -634,6 +624,10 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	type CallInterrupt = Infallible;
 	type CallFeedback = Infallible;
 
+	fn keccak256_h256(&self, data: &[u8]) -> H256 {
+		self.backend.keccak256_h256(data)
+	}
+
 	fn balance(&self, address: H160) -> U256 {
 		self.state.get(&address).map(|v| v.basic.balance)
 			.unwrap_or(self.backend.basic(address).balance)
@@ -666,7 +660,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		let value = self.state.get(&address).and_then(|v| {
 			v.code.as_ref().map(|c| {
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
-                                keccak256_digest(&c)
+				self.backend.keccak256_h256(&c)
 			})
 		}).unwrap_or(self.backend.code_hash(address));
 		value
@@ -788,14 +782,21 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn pre_validate(
 		&mut self,
 		_context: &Context,
-		_opcode: Result<Opcode, ExternalOpcode>,
+		_opcode: Opcode,
 		_stack: &Stack
 	) -> Result<(), ExitError> {
-		//let (gas_cost, memory_cost) = gasometer::opcode_cost(
-		//	context.address, opcode, stack, self.is_static, &self.config, self
-		//)?;
+		// if let Some(cost) = gasometer::static_opcode_cost(opcode) {
+		// 	self.state.metadata_mut().gasometer.record_cost(cost)?;
+		// } else {
+		// 	let is_static = self.state.metadata().is_static;
+		// 	let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(
+		// 		context.address, opcode, stack, is_static, &self.config, self
+		// 	)?;
 
-		//self.gasometer.record_opcode(gas_cost, memory_cost)?;
+		// 	let gasometer = &mut self.state.metadata_mut().gasometer;
+
+		// 	gasometer.record_dynamic_cost(gas_cost, memory_cost)?;
+		// }
 
 		Ok(())
 	}
