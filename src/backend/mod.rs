@@ -37,6 +37,7 @@ pub struct Log {
         /// topics
 	pub topics: Vec<H256>,
         /// data
+	#[serde(with = "serde_bytes")]
 	pub data: Bytes,
 }
 //pub use ethereum::Log;
