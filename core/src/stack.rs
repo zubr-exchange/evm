@@ -1,12 +1,11 @@
-use primitive_types::{H256, U256};
 use alloc::vec::Vec;
-use crate::ExitError;
+use crate::{ExitError, H256, U256};
 
 #[cfg(feature = "with-serde")]
 mod serde_vec_u256 {
 	use serde::{Serializer, Deserializer, de};
-	use primitive_types::U256;
 	use alloc::{fmt, vec::Vec};
+	use crate::U256;
 
 	pub fn serialize<S: Serializer>(data: &Vec<U256>, serializer: S) -> Result<S::Ok, S::Error>
 	{

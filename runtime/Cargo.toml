@@ -10,7 +10,6 @@ edition = "2018"
 
 [dependencies]
 evm-core = { version = "0.18", path = "../core", default-features = false }
-primitive-types = { version = "0.7", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 codec = { package = "parity-scale-codec", version = "1.3", default-features = false, features = ["derive", "full"], optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
@@ -18,6 +17,6 @@ serde_bytes = { version = "0.11.5", optional = true }
 
 [features]
 default = ["std"]
-with-codec = ["codec", "primitive-types/impl-codec"]
-with-serde = ["serde", "serde_bytes", "primitive-types/impl-serde"]
-std = ["evm-core/std", "primitive-types/std", "sha3/std"]
+with-codec = ["codec"]
+with-serde = ["serde", "serde_bytes"]
+std = ["evm-core/std", "sha3/std"]

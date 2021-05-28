@@ -1,7 +1,6 @@
 use core::ops::Rem;
 use core::convert::TryInto;
-use primitive_types::{U256, U512};
-use crate::utils::I256;
+use crate::{utils::I256, U256, U512};
 
 pub fn div(op1: U256, op2: U256) -> U256 {
 	if op2 == U256::zero() {

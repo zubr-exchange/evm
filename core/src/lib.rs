@@ -16,6 +16,7 @@ mod opcode;
 mod error;
 mod eval;
 mod utils;
+mod primitive_types;
 
 pub use crate::code::Code;
 pub use crate::memory::Memory;
@@ -23,6 +24,7 @@ pub use crate::stack::Stack;
 pub use crate::valids::Valids;
 pub use crate::opcode::Opcode;
 pub use crate::error::{Trap, Capture, ExitReason, ExitSucceed, ExitError, ExitRevert, ExitFatal};
+pub use crate::primitive_types::{H160, H256, U256, U512};
 
 use core::ops::Range;
 use alloc::vec::Vec;

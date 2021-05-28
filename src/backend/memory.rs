@@ -1,11 +1,10 @@
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::convert::Infallible;
-use primitive_types::{H160, H256, U256};
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, ExitReason, Code};
+use crate::{Capture, Transfer, ExitReason, Code, H160, H256, U256};
 
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]

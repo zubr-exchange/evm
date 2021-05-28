@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
-use primitive_types::{H160, H256, U256};
 use crate::{Capture, Stack, ExitError, Opcode,
-			CreateScheme, Context, Machine, ExitReason, Code};
+			CreateScheme, Context, Machine, ExitReason, Code,
+			H160, H256, U256};
 
 /// Transfer from source to target, with given value.
 #[derive(Clone, Debug)]
