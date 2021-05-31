@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::ops::Deref;
-use primitive_types::H160;
+use crate::H160;
 
 /// Contract code
 #[derive(Clone, Debug)]

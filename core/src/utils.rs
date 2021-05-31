@@ -1,6 +1,6 @@
 use core::ops::{Rem, Div};
 use core::cmp::Ordering;
-use primitive_types::U256;
+use crate::U256;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Sign {

@@ -1,8 +1,8 @@
 use core::cmp::min;
 use alloc::vec::Vec;
-use primitive_types::{H160, H256, U256};
 use crate::{Runtime, ExitError, Handler, Capture, Transfer, ExitReason,
-			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal};
+			CreateScheme, CallScheme, Context, ExitSucceed, ExitFatal,
+			H160, H256, U256};
 use super::Control;
 
 pub fn sha3<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {

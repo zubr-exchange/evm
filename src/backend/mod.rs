@@ -9,9 +9,8 @@ pub use self::memory::{MemoryBackend, MemoryVicinity, MemoryAccount};
 
 use alloc::vec::Vec;
 use core::convert::Infallible;
-use primitive_types::{H160, H256, U256};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, ExitReason, Code};
+use crate::{Capture, Transfer, ExitReason, Code, H160, H256, U256};
 
 /// Basic account information.
 #[derive(Clone, Eq, PartialEq, Debug, Default)]

@@ -1,7 +1,6 @@
 use core::cmp::min;
-use primitive_types::{H256, U256};
 use super::Control;
-use crate::{Machine, ExitError, ExitSucceed, ExitFatal, ExitRevert};
+use crate::{Machine, ExitError, ExitSucceed, ExitFatal, ExitRevert, H256, U256};
 
 pub fn codesize(state: &mut Machine) -> Control {
 	let size = U256::from(state.code.len());

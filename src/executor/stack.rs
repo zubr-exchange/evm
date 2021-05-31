@@ -2,9 +2,8 @@ use core::convert::Infallible;
 use core::cmp::min;
 use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
-use primitive_types::{U256, H256, H160};
 use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer,
-			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config, Code};
+			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config, Code, U256, H256, H160};
 use crate::backend::{Log, Basic, Apply, Backend};
 //use crate::gasometer::{self, Gasometer};
 
