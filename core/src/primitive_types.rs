@@ -172,3 +172,25 @@ impl<'de> serde::Deserialize<'de> for U256 {
 		deserializer.deserialize_bytes(Visitor)
 	}
 }
+
+
+impl U256 {
+	pub fn into_big_endian_fast(self, buffer: &mut [u8]) {
+		let data: [u8; 32] = unsafe { core::mem::transmute(self) };
+		
+		let buffer = &mut buffer[0..32];
+		buffer.copy_from_slice(&data[..]);
+		buffer.reverse();
+	}
+
+	pub fn from_big_endian_fast(buffer: &[u8]) -> U256 {
+		assert!(32 >= buffer.len());
+
+		let mut data = [0u8; 32];
+
+		data[32 - buffer.len()..32].copy_from_slice(buffer);
+		data.reverse();
+
+		unsafe { core::mem::transmute(data) }
+	}
+}

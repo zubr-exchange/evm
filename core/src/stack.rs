@@ -83,7 +83,7 @@ impl Stack {
 		self.data.pop()
 			.map(|d| {
 				let mut value = H256::default();
-				d.to_big_endian(&mut value[..]);
+				d.into_big_endian_fast(&mut value[..]);
 				value
 			})
 			.ok_or(ExitError::StackUnderflow)
@@ -95,7 +95,7 @@ impl Stack {
 		if self.data.len() + 1 > self.limit {
 			return Err(ExitError::StackOverflow)
 		}
-		self.data.push(U256::from_big_endian(&value[..]));
+		self.data.push(U256::from_big_endian_fast(&value[..]));
 		Ok(())
 	}
 

@@ -153,7 +153,7 @@ pub fn msize(state: &mut Machine) -> Control {
 
 pub fn push(state: &mut Machine, n: usize, position: usize) -> Control {
 	let end = min(position + 1 + n, state.code.len());
-	let val = U256::from(&state.code[(position + 1)..end]);
+	let val = U256::from_big_endian_fast(&state.code[(position + 1)..end]);
 
 	push_u256!(state, val);
 	trace_op!("Push [@{}]: {}", state.stack.len() - 1, val);
