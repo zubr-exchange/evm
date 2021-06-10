@@ -28,17 +28,11 @@ pub fn calldataload(state: &mut Machine) -> Control {
 	pop_u256!(state, index);
 	trace_op!("CallDataLoad: {}", index);
 
+	let index = as_usize_or_fail!(index);
+	let len = if index > state.data.len() { 0 } else { min(32, state.data.len() - index) };
+
 	let mut load = [0u8; 32];
-	for i in 0..32 {
-		if let Some(p) = index.checked_add(U256::from(i)) {
-			if p <= U256::from(usize::max_value()) {
-				let p = p.as_usize();
-				if p < state.data.len() {
-					load[i] = state.data[p];
-				}
-			}
-		}
-	}
+	load[0..len].copy_from_slice(&state.data[index..index + len]);
 
 	push!(state, H256::from(load));
 	Control::Continue(1)
@@ -153,7 +147,7 @@ pub fn msize(state: &mut Machine) -> Control {
 
 pub fn push(state: &mut Machine, n: usize, position: usize) -> Control {
 	let end = min(position + 1 + n, state.code.len());
-	let val = U256::from(&state.code[(position + 1)..end]);
+	let val = U256::from_big_endian_fast(&state.code[(position + 1)..end]);
 
 	push_u256!(state, val);
 	trace_op!("Push [@{}]: {}", state.stack.len() - 1, val);
