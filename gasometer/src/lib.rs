@@ -10,10 +10,8 @@ mod costs;
 mod memory;
 mod utils;
 
-use core::cmp::max;
-use primitive_types::{H160, H256, U256};
-use evm_core::{Opcode, ExitError, Stack};
-use evm_runtime::{Handler, Config};
+use evm_core::{ExitError, Opcode, Stack, H160, H256, U256};
+use evm_runtime::{Config, Handler};
 
 macro_rules! try_or_fail {
 	( $inner:expr, $e:expr ) => (
@@ -29,8 +27,11 @@ macro_rules! try_or_fail {
 
 /// EVM gasometer.
 #[derive(Clone)]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Gasometer<'config> {
 	gas_limit: usize,
+        #[cfg_attr(feature = "with-serde", serde(skip))]
+        #[cfg_attr(feature = "with-serde", serde(default = "Config::default"))]
 	config: &'config Config,
 	inner: Result<Inner<'config>, ExitError>
 }
@@ -222,119 +223,119 @@ pub fn static_opcode_cost(
 	opcode: Opcode,
 ) -> Option<u64> {
 	static TABLE: [Option<u64>; 256] = {
-		let mut table = [None; 256];
+		let mut table: [Option<u64>; 256] = [None; 256];
 
-		table[Opcode::STOP.as_usize()] = Some(consts::G_ZERO);
-		table[Opcode::CALLDATASIZE.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::CODESIZE.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::POP.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::PC.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::MSIZE.as_usize()] = Some(consts::G_BASE);
+		table[Opcode::STOP.as_usize()] = Some(consts::G_ZERO as u64);
+		table[Opcode::CALLDATASIZE.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::CODESIZE.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::POP.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::PC.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::MSIZE.as_usize()] = Some(consts::G_BASE as u64);
 
-		table[Opcode::ADDRESS.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::ORIGIN.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::CALLER.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::CALLVALUE.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::COINBASE.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::TIMESTAMP.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::NUMBER.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::DIFFICULTY.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::GASLIMIT.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::GASPRICE.as_usize()] = Some(consts::G_BASE);
-		table[Opcode::GAS.as_usize()] = Some(consts::G_BASE);
+		table[Opcode::ADDRESS.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::ORIGIN.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::CALLER.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::CALLVALUE.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::COINBASE.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::TIMESTAMP.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::NUMBER.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::DIFFICULTY.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::GASLIMIT.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::GASPRICE.as_usize()] = Some(consts::G_BASE as u64);
+		table[Opcode::GAS.as_usize()] = Some(consts::G_BASE as u64);
 
-		table[Opcode::ADD.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SUB.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::NOT.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::LT.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::GT.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SLT.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SGT.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::EQ.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::ISZERO.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::AND.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::OR.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::XOR.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::BYTE.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::CALLDATALOAD.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH1.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH2.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH3.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH4.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH5.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH6.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH7.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH8.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH9.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH10.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH11.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH12.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH13.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH14.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH15.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH16.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH17.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH18.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH19.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH20.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH21.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH22.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH23.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH24.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH25.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH26.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH27.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH28.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH29.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH30.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH31.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::PUSH32.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP1.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP2.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP3.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP4.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP5.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP6.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP7.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP8.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP9.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP10.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP11.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP12.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP13.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP14.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP15.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::DUP16.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP1.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP2.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP3.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP4.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP5.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP6.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP7.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP8.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP9.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP10.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP11.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP12.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP13.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP14.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP15.as_usize()] = Some(consts::G_VERYLOW);
-		table[Opcode::SWAP16.as_usize()] = Some(consts::G_VERYLOW);
+		table[Opcode::ADD.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SUB.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::NOT.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::LT.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::GT.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SLT.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SGT.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::EQ.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::ISZERO.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::AND.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::OR.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::XOR.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::BYTE.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::CALLDATALOAD.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH1.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH2.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH3.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH4.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH5.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH6.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH7.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH8.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH9.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH10.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH11.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH12.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH13.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH14.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH15.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH16.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH17.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH18.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH19.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH20.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH21.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH22.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH23.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH24.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH25.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH26.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH27.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH28.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH29.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH30.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH31.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::PUSH32.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP1.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP2.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP3.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP4.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP5.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP6.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP7.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP8.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP9.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP10.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP11.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP12.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP13.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP14.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP15.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::DUP16.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP1.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP2.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP3.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP4.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP5.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP6.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP7.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP8.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP9.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP10.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP11.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP12.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP13.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP14.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP15.as_usize()] = Some(consts::G_VERYLOW as u64);
+		table[Opcode::SWAP16.as_usize()] = Some(consts::G_VERYLOW as u64);
 
-		table[Opcode::MUL.as_usize()] = Some(consts::G_LOW);
-		table[Opcode::DIV.as_usize()] = Some(consts::G_LOW);
-		table[Opcode::SDIV.as_usize()] = Some(consts::G_LOW);
-		table[Opcode::MOD.as_usize()] = Some(consts::G_LOW);
-		table[Opcode::SMOD.as_usize()] = Some(consts::G_LOW);
-		table[Opcode::SIGNEXTEND.as_usize()] = Some(consts::G_LOW);
+		table[Opcode::MUL.as_usize()] = Some(consts::G_LOW as u64);
+		table[Opcode::DIV.as_usize()] = Some(consts::G_LOW as u64);
+		table[Opcode::SDIV.as_usize()] = Some(consts::G_LOW as u64);
+		table[Opcode::MOD.as_usize()] = Some(consts::G_LOW as u64);
+		table[Opcode::SMOD.as_usize()] = Some(consts::G_LOW as u64);
+		table[Opcode::SIGNEXTEND.as_usize()] = Some(consts::G_LOW as u64);
 
-		table[Opcode::ADDMOD.as_usize()] = Some(consts::G_MID);
-		table[Opcode::MULMOD.as_usize()] = Some(consts::G_MID);
-		table[Opcode::JUMP.as_usize()] = Some(consts::G_MID);
+		table[Opcode::ADDMOD.as_usize()] = Some(consts::G_MID as u64);
+		table[Opcode::MULMOD.as_usize()] = Some(consts::G_MID as u64);
+		table[Opcode::JUMP.as_usize()] = Some(consts::G_MID as u64);
 
-		table[Opcode::JUMPI.as_usize()] = Some(consts::G_HIGH);
-		table[Opcode::JUMPDEST.as_usize()] = Some(consts::G_JUMPDEST);
+		table[Opcode::JUMPI.as_usize()] = Some(consts::G_HIGH as u64);
+		table[Opcode::JUMPDEST.as_usize()] = Some(consts::G_JUMPDEST as u64);
 
 		table
 	};
@@ -351,6 +352,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 	config: &Config,
 	handler: &H
 ) -> Result<(GasCost, Option<MemoryCost>), ExitError> {
+        use byte_slice_cast::AsByteSlice;
 	let gas_cost = match opcode {
 		Opcode::RETURN => GasCost::Zero,
 
@@ -377,37 +379,37 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::EXTCODEHASH => GasCost::Invalid,
 
 		Opcode::CALLCODE => GasCost::CallCode {
-			value: U256::from_big_endian(&stack.peek(2)?[..]),
-			gas: U256::from_big_endian(&stack.peek(0)?[..]),
-			target_exists: handler.exists(stack.peek(1)?.into()),
+			value: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::STATICCALL => GasCost::StaticCall {
-			gas: U256::from_big_endian(&stack.peek(0)?[..]),
-			target_exists: handler.exists(stack.peek(1)?.into()),
+			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::SHA3 => GasCost::Sha3 {
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::EXTCODECOPY => GasCost::ExtCodeCopy {
-			len: U256::from_big_endian(&stack.peek(3)?[..]),
+			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
 		},
 		Opcode::CALLDATACOPY | Opcode::CODECOPY => GasCost::VeryLowCopy {
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
+			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
 		},
 		Opcode::EXP => GasCost::Exp {
-			power: U256::from_big_endian(&stack.peek(1)?[..]),
+			power: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::SLOAD => GasCost::SLoad,
 
 		Opcode::DELEGATECALL if config.has_delegate_call => GasCost::DelegateCall {
-			gas: U256::from_big_endian(&stack.peek(0)?[..]),
-			target_exists: handler.exists(stack.peek(1)?.into()),
+			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::DELEGATECALL => GasCost::Invalid,
 
 		Opcode::RETURNDATASIZE if config.has_return_data => GasCost::Base,
 		Opcode::RETURNDATACOPY if config.has_return_data => GasCost::VeryLowCopy {
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
+			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
 		},
 		Opcode::RETURNDATASIZE | Opcode::RETURNDATACOPY => GasCost::Invalid,
 
@@ -416,47 +418,47 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			let value = stack.peek(1)?;
 
 			GasCost::SStore {
-				original: handler.original_storage(address, index),
-				current: handler.storage(address, index),
-				new: value,
+				original: handler.original_storage(address, index).to_h256(),
+				current: handler.storage(address, index).to_h256(),
+				new: value.to_h256(),
 			}
 		},
 		Opcode::LOG0 if !is_static => GasCost::Log {
 			n: 0,
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::LOG1 if !is_static => GasCost::Log {
 			n: 1,
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::LOG2 if !is_static => GasCost::Log {
 			n: 2,
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::LOG3 if !is_static => GasCost::Log {
 			n: 3,
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::LOG4 if !is_static => GasCost::Log {
 			n: 4,
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		},
 		Opcode::CREATE if !is_static => GasCost::Create,
 		Opcode::CREATE2 if !is_static && config.has_create2 => GasCost::Create2 {
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
+			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
 		},
 		Opcode::SUICIDE if !is_static => GasCost::Suicide {
 			value: handler.balance(address),
-			target_exists: handler.exists(stack.peek(0)?.into()),
+			target_exists: handler.exists(stack.peek(0)?.to_h256().into()),
 			already_removed: handler.deleted(address),
 		},
 		Opcode::CALL
 			if !is_static ||
-			(is_static && U256::from_big_endian(&stack.peek(2)?[..]) == U256::zero()) =>
+			(is_static && U256::from_big_endian(&stack.peek(2)?.as_byte_slice()) == U256::zero()) =>
 			GasCost::Call {
-				value: U256::from_big_endian(&stack.peek(2)?[..]),
-				gas: U256::from_big_endian(&stack.peek(0)?[..]),
-				target_exists: handler.exists(stack.peek(1)?.into()),
+				value: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+				gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+				target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 			},
 
 		_ => GasCost::Invalid,
@@ -466,51 +468,51 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::SHA3 | Opcode::RETURN | Opcode::REVERT |
 		Opcode::LOG0 | Opcode::LOG1 | Opcode::LOG2 |
 		Opcode::LOG3 | Opcode::LOG4 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
-			len: U256::from_big_endian(&stack.peek(1)?[..]),
+			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
 		}),
 
 		Opcode::CODECOPY | Opcode::CALLDATACOPY |
 		Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
+			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
 		}),
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(1)?[..]),
-			len: U256::from_big_endian(&stack.peek(3)?[..]),
+			offset: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
 		}),
 
 		Opcode::MLOAD | Opcode::MSTORE => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
+			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
 			len: U256::from(32),
 		}),
 
 		Opcode::MSTORE8 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?[..]),
+			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
 			len: U256::from(1),
 		}),
 
 		Opcode::CREATE | Opcode::CREATE2 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(1)?[..]),
-			len: U256::from_big_endian(&stack.peek(2)?[..]),
+			offset: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
 		}),
 
 		Opcode::CALL | Opcode::CALLCODE => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(3)?[..]),
-			len: U256::from_big_endian(&stack.peek(4)?[..]),
+			offset: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(4)?.as_byte_slice()),
 		}.join(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(5)?[..]),
-			len: U256::from_big_endian(&stack.peek(6)?[..]),
+			offset: U256::from_big_endian(&stack.peek(5)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(6)?.as_byte_slice()),
 		})),
 
 		Opcode::DELEGATECALL |
 		Opcode::STATICCALL => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(2)?[..]),
-			len: U256::from_big_endian(&stack.peek(3)?[..]),
+			offset: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
 		}.join(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(4)?[..]),
-			len: U256::from_big_endian(&stack.peek(5)?[..]),
+			offset: U256::from_big_endian(&stack.peek(4)?.as_byte_slice()),
+			len: U256::from_big_endian(&stack.peek(5)?.as_byte_slice()),
 		})),
 
 		_ => None,
@@ -520,10 +522,13 @@ pub fn dynamic_opcode_cost<H: Handler>(
 }
 
 #[derive(Clone)]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 struct Inner<'config> {
 	memory_cost: usize,
 	used_gas: usize,
 	refunded_gas: isize,
+        #[cfg_attr(feature = "with-serde", serde(skip))]
+        #[cfg_attr(feature = "with-serde", serde(default = "Config::default"))]
 	config: &'config Config,
 }
 
@@ -553,7 +558,7 @@ impl<'config> Inner<'config> {
 			end / 32 + 1
 		};
 
-		Ok(max(self.memory_cost, new))
+		Ok(core::cmp::max(self.memory_cost, new))
 	}
 
 	fn extra_check(

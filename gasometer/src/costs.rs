@@ -1,7 +1,6 @@
-use primitive_types::{H256, U256};
-use evm_core::ExitError;
-use crate::Config;
 use crate::consts::*;
+use crate::Config;
+use evm_core::{ExitError, H256, U256};
 
 pub fn call_extra_check(gas: U256, after_gas: usize, config: &Config) -> Result<(), ExitError> {
 	if config.err_on_call_with_more_gas && U256::from(after_gas) < gas {

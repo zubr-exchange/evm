@@ -193,4 +193,9 @@ impl U256 {
 
 		unsafe { core::mem::transmute(data) }
 	}
+
+
+        pub fn to_h256(&self) -> H256 {
+               unsafe { core::mem::transmute(*self) }
+        }
 }

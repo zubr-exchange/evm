@@ -1,4 +1,4 @@
-use primitive_types::U256;
+use evm_core::U256;
 
 pub fn log2floor(value: U256) -> usize {
     assert!(value != U256::zero());
