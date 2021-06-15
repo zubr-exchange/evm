@@ -4,7 +4,11 @@ use core::convert::Infallible;
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, ExitReason, Code, H160, H256, U256};
+use crate::{Capture, Transfer, ExitReason, H160, H256, U256};
+
+fn keccak256_digest(data: &[u8]) -> H256 {
+    H256::from_slice(Keccak256::digest(&data).as_slice())
+}
 
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -113,8 +117,8 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		self.state.get(&address).map(|v| v.code.len()).unwrap_or(0)
 	}
 
-	fn code(&self, address: H160) -> Code {
-		Code::Vec{ code: self.state.get(&address).map(|v| v.code.clone()).unwrap_or_default() }
+	fn code(&self, address: H160) -> Vec<u8> {
+		self.state.get(&address).map(|v| v.code.clone()).unwrap_or_default()
 	}
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
