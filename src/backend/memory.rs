@@ -6,10 +6,6 @@ use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
 use crate::{Capture, Transfer, ExitReason, H160, H256, U256};
 
-fn keccak256_digest(data: &[u8]) -> H256 {
-    H256::from_slice(Keccak256::digest(&data).as_slice())
-}
-
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
