@@ -8,7 +8,6 @@
 extern crate core;
 extern crate alloc;
 
-mod code;
 mod memory;
 mod stack;
 mod valids;
@@ -18,7 +17,6 @@ mod eval;
 mod utils;
 mod primitive_types;
 
-pub use crate::code::Code;
 pub use crate::memory::Memory;
 pub use crate::stack::Stack;
 pub use crate::valids::Valids;
@@ -38,7 +36,8 @@ pub struct Machine {
 	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	data: Vec<u8>,
 	/// Program code.
-	code: Code,
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
+	code: Vec<u8>,
 	/// Program counter.
 	position: Result<usize, ExitReason>,
 	/// Return value.
@@ -60,14 +59,10 @@ impl Machine {
 	pub fn memory(&self) -> &Memory { &self.memory }
 	/// Mutable reference of machine memory.
 	pub fn memory_mut(&mut self) -> &mut Memory { &mut self.memory }
-	/// Reference of machine code.
-	pub fn code(&self) -> &Code { &self.code }
-	/// Mutable reference of machine code.
-	pub fn code_mut(&mut self) -> &mut Code { &mut self.code }
 
 	/// Create a new machine with given code and data.
 	pub fn new(
-		code: Code,
+		code: Vec<u8>,
 		data: Vec<u8>,
 		stack_limit: usize,
 		memory_limit: usize

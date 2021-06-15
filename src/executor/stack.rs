@@ -1,7 +1,7 @@
 use crate::backend::{Apply, Backend, Basic, Log};
 use crate::gasometer::{self, Gasometer};
 use crate::{
-    Capture, Code, Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, Handler,
+    Capture, Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, Handler,
     Opcode, Runtime, Stack, Transfer, H160, H256, U256,
 };
 use alloc::collections::{BTreeMap, BTreeSet};
@@ -394,7 +394,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				}
 			} else  {
 				let code = substate.backend.code(address);
-				substate.account_mut(address).code = Some((&code[..]).into());
+				substate.account_mut(address).code = Some(code.clone());
 
 				if code.len() != 0 {
 					let _ = self.merge_fail(substate);
@@ -434,7 +434,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 
 		let mut runtime = Runtime::new(
-			Code::Vec{ code: init_code },
+			init_code,
 			Vec::new(),
 			context,
 			self.config,
@@ -666,9 +666,9 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		value
 	}
 
-	fn code(&self, address: H160) -> Code {
+	fn code(&self, address: H160) -> Vec<u8> {
 		self.state.get(&address).and_then(|v| {
-			v.code.clone().map(|code| Code::Vec{ code })
+			v.code.clone()
 		}).unwrap_or(self.backend.code(address))
 	}
 
