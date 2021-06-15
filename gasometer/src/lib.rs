@@ -352,7 +352,6 @@ pub fn dynamic_opcode_cost<H: Handler>(
 	config: &Config,
 	handler: &H
 ) -> Result<(GasCost, Option<MemoryCost>), ExitError> {
-        use byte_slice_cast::AsByteSlice;
 	let gas_cost = match opcode {
 		Opcode::RETURN => GasCost::Zero,
 
@@ -379,37 +378,37 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::EXTCODEHASH => GasCost::Invalid,
 
 		Opcode::CALLCODE => GasCost::CallCode {
-			value: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
-			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			value: stack.peek(2)?,
+			gas: stack.peek(0)?,
 			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::STATICCALL => GasCost::StaticCall {
-			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			gas: stack.peek(0)?,
 			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::SHA3 => GasCost::Sha3 {
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::EXTCODECOPY => GasCost::ExtCodeCopy {
-			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
+			len: stack.peek(3)?,
 		},
 		Opcode::CALLDATACOPY | Opcode::CODECOPY => GasCost::VeryLowCopy {
-			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			len: stack.peek(2)?,
 		},
 		Opcode::EXP => GasCost::Exp {
-			power: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			power: stack.peek(1)?,
 		},
 		Opcode::SLOAD => GasCost::SLoad,
 
 		Opcode::DELEGATECALL if config.has_delegate_call => GasCost::DelegateCall {
-			gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			gas: stack.peek(0)?,
 			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 		},
 		Opcode::DELEGATECALL => GasCost::Invalid,
 
 		Opcode::RETURNDATASIZE if config.has_return_data => GasCost::Base,
 		Opcode::RETURNDATACOPY if config.has_return_data => GasCost::VeryLowCopy {
-			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			len: stack.peek(2)?,
 		},
 		Opcode::RETURNDATASIZE | Opcode::RETURNDATACOPY => GasCost::Invalid,
 
@@ -425,27 +424,27 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		},
 		Opcode::LOG0 if !is_static => GasCost::Log {
 			n: 0,
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::LOG1 if !is_static => GasCost::Log {
 			n: 1,
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::LOG2 if !is_static => GasCost::Log {
 			n: 2,
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::LOG3 if !is_static => GasCost::Log {
 			n: 3,
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::LOG4 if !is_static => GasCost::Log {
 			n: 4,
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			len: stack.peek(1)?,
 		},
 		Opcode::CREATE if !is_static => GasCost::Create,
 		Opcode::CREATE2 if !is_static && config.has_create2 => GasCost::Create2 {
-			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			len: stack.peek(2)?,
 		},
 		Opcode::SUICIDE if !is_static => GasCost::Suicide {
 			value: handler.balance(address),
@@ -454,10 +453,10 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		},
 		Opcode::CALL
 			if !is_static ||
-			(is_static && U256::from_big_endian(&stack.peek(2)?.as_byte_slice()) == U256::zero()) =>
+			(is_static && stack.peek(2)?.is_zero()) =>
 			GasCost::Call {
-				value: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
-				gas: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+				value: stack.peek(2)?,
+				gas: stack.peek(0)?,
 				target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
 			},
 
@@ -468,51 +467,51 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::SHA3 | Opcode::RETURN | Opcode::REVERT |
 		Opcode::LOG0 | Opcode::LOG1 | Opcode::LOG2 |
 		Opcode::LOG3 | Opcode::LOG4 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
+			offset: stack.peek(0)?,
+			len: stack.peek(1)?,
 		}),
 
 		Opcode::CODECOPY | Opcode::CALLDATACOPY |
 		Opcode::RETURNDATACOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			offset: stack.peek(0)?,
+			len: stack.peek(2)?,
 		}),
 
 		Opcode::EXTCODECOPY => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
+			offset: stack.peek(1)?,
+			len: stack.peek(3)?,
 		}),
 
 		Opcode::MLOAD | Opcode::MSTORE => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			offset: stack.peek(0)?,
 			len: U256::from(32),
 		}),
 
 		Opcode::MSTORE8 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(0)?.as_byte_slice()),
+			offset: stack.peek(0)?,
 			len: U256::from(1),
 		}),
 
 		Opcode::CREATE | Opcode::CREATE2 => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(1)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
+			offset: stack.peek(1)?,
+			len: stack.peek(2)?,
 		}),
 
 		Opcode::CALL | Opcode::CALLCODE => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(4)?.as_byte_slice()),
+			offset: stack.peek(3)?,
+			len: stack.peek(4)?,
 		}.join(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(5)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(6)?.as_byte_slice()),
+			offset: stack.peek(5)?,
+			len: stack.peek(6)?,
 		})),
 
 		Opcode::DELEGATECALL |
 		Opcode::STATICCALL => Some(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(2)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(3)?.as_byte_slice()),
+			offset: stack.peek(2)?,
+			len: stack.peek(3)?,
 		}.join(MemoryCost {
-			offset: U256::from_big_endian(&stack.peek(4)?.as_byte_slice()),
-			len: U256::from_big_endian(&stack.peek(5)?.as_byte_slice()),
+			offset: stack.peek(4)?,
+			len: stack.peek(5)?,
 		})),
 
 		_ => None,
@@ -540,7 +539,7 @@ impl<'config> Inner<'config> {
 		let from = memory.offset;
 		let len = memory.len;
 
-		if len == U256::zero() {
+		if len.is_zero() {
 			return Ok(self.memory_cost)
 		}
 
@@ -772,11 +771,11 @@ pub enum TransactionCost {
 impl MemoryCost {
 	/// Join two memory cost together.
 	pub fn join(self, other: MemoryCost) -> MemoryCost {
-		if self.len == U256::zero() {
+		if self.len.is_zero() {
 			return other
 		}
 
-		if other.len == U256::zero() {
+		if other.len.is_zero() {
 			return self
 		}
 

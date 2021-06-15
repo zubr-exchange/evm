@@ -9,7 +9,6 @@ keywords = ["no_std", "ethereum"]
 edition = "2018"
 
 [dependencies]
-byte-slice-cast = "1.0"
 evm-core = { version = "0.18", path = "../core", default-features = false }
 evm-runtime = { version = "0.18", path = "../runtime", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
