@@ -380,11 +380,11 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		Opcode::CALLCODE => GasCost::CallCode {
 			value: stack.peek(2)?,
 			gas: stack.peek(0)?,
-			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
+			target_exists: handler.exists(stack.peek(1)?.into()),
 		},
 		Opcode::STATICCALL => GasCost::StaticCall {
 			gas: stack.peek(0)?,
-			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
+			target_exists: handler.exists(stack.peek(1)?.into()),
 		},
 		Opcode::SHA3 => GasCost::Sha3 {
 			len: stack.peek(1)?,
@@ -402,7 +402,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 
 		Opcode::DELEGATECALL if config.has_delegate_call => GasCost::DelegateCall {
 			gas: stack.peek(0)?,
-			target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
+			target_exists: handler.exists(stack.peek(1)?.into()),
 		},
 		Opcode::DELEGATECALL => GasCost::Invalid,
 
@@ -417,9 +417,9 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			let value = stack.peek(1)?;
 
 			GasCost::SStore {
-				original: handler.original_storage(address, index).to_h256(),
-				current: handler.storage(address, index).to_h256(),
-				new: value.to_h256(),
+				original: handler.original_storage(address, index).into(),
+				current: handler.storage(address, index).into(),
+				new: value.into(),
 			}
 		},
 		Opcode::LOG0 if !is_static => GasCost::Log {
@@ -448,7 +448,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 		},
 		Opcode::SUICIDE if !is_static => GasCost::Suicide {
 			value: handler.balance(address),
-			target_exists: handler.exists(stack.peek(0)?.to_h256().into()),
+			target_exists: handler.exists(stack.peek(0)?.into()),
 			already_removed: handler.deleted(address),
 		},
 		Opcode::CALL
@@ -457,7 +457,7 @@ pub fn dynamic_opcode_cost<H: Handler>(
 			GasCost::Call {
 				value: stack.peek(2)?,
 				gas: stack.peek(0)?,
-				target_exists: handler.exists(stack.peek(1)?.to_h256().into()),
+				target_exists: handler.exists(stack.peek(1)?.into()),
 			},
 
 		_ => GasCost::Invalid,
