@@ -1,12 +1,13 @@
-use crate::backend::{Apply, Backend, Basic, Log};
-use crate::gasometer::{self, Gasometer};
-use crate::{
-    Capture, Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, Handler,
-    Opcode, Runtime, Stack, Transfer, H160, H256, U256,
-};
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::convert::Infallible;
+
+use crate::{
+	Capture, Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, H160,
+	H256, Handler, Opcode, Runtime, Stack, Transfer, U256,
+};
+use crate::backend::{Apply, Backend, Basic, Log};
+use crate::gasometer::{self, Gasometer};
 
 /// Account definition for the stack-based executor.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
@@ -22,6 +23,9 @@ pub struct StackAccount {
 	pub reset_storage: bool,
 }
 
+type PrecompileOutput = (ExitSucceed, Vec<u8>, u64);
+type PrecompileFn = fn(H160, &[u8], Option<u64>) -> Option<Result<PrecompileOutput, ExitError>>;
+
 /// Stack-based executor.
 #[derive(Clone)]
 pub struct StackExecutor<'backend, 'config, B> {
@@ -31,7 +35,7 @@ pub struct StackExecutor<'backend, 'config, B> {
 	state: BTreeMap<H160, StackAccount>,
 	deleted: BTreeSet<H160>,
 	logs: Vec<Log>,
-	precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+	precompile: PrecompileFn,
 	is_static: bool,
 	depth: Option<usize>,
 }
@@ -39,8 +43,8 @@ pub struct StackExecutor<'backend, 'config, B> {
 fn no_precompile(
 	_address: H160,
 	_input: &[u8],
-	_target_gas: Option<usize>
-) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>> {
+	_target_gas: Option<u64>
+) -> Option<Result<PrecompileOutput, ExitError>> {
 	None
 }
 
@@ -48,7 +52,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
-		gas_limit: usize,
+		gas_limit: u64,
 		config: &'config Config,
 	) -> Self {
 		Self::new_with_precompile(backend, gas_limit, config, no_precompile)
@@ -57,9 +61,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	/// Create a new stack-based executor with given precompiles.
 	pub fn new_with_precompile(
 		backend: &'backend B,
-		gas_limit: usize,
+		gas_limit: u64,
 		config: &'config Config,
-		precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+		precompile: PrecompileFn,
 	) -> Self {
 		Self {
 			backend,
@@ -68,14 +72,14 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			deleted: BTreeSet::new(),
 			config,
 			logs: Vec::new(),
-			precompile: precompile,
+			precompile,
 			is_static: false,
 			depth: None,
 		}
 	}
 
 	/// Create a substate executor from the current executor.
-	pub fn substate(&self, gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, B> {
+	pub fn substate(&self, gas_limit: u64, is_static: bool) -> StackExecutor<'backend, 'config, B> {
 		Self {
 			backend: self.backend,
 			gasometer: Gasometer::new(gas_limit, self.gasometer.config()),
@@ -101,15 +105,15 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get remaining gas.
-	pub fn gas(&self) -> usize {
+	pub fn gas(&self) -> u64 {
 		self.gasometer.gas()
                 // 12341234
 	}
 
 	/// Merge a substate executor that succeeded.
-	pub fn merge_succeed<'obackend, 'oconfig, OB>(
+	pub fn merge_succeed<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 		self.deleted.append(&mut substate.deleted);
@@ -121,9 +125,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that reverted.
-	pub fn merge_revert<'obackend, 'oconfig, OB>(
+	pub fn merge_revert<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -132,9 +136,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that failed.
-	pub fn merge_fail<'obackend, 'oconfig, OB>(
+	pub fn merge_fail<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -147,7 +151,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		caller: H160,
 		value: U256,
 		init_code: Vec<u8>,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> ExitReason {
 		let transaction_cost = gasometer::create_transaction_cost(&init_code);
 		match self.gasometer.record_transaction(transaction_cost) {
@@ -175,7 +179,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		value: U256,
 		init_code: Vec<u8>,
 		salt: H256,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> ExitReason {
 		let transaction_cost = gasometer::create_transaction_cost(&init_code);
 		match self.gasometer.record_transaction(transaction_cost) {
@@ -204,7 +208,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		address: H160,
 		value: U256,
 		data: Vec<u8>,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> (ExitReason, Vec<u8>) {
 		let transaction_cost = gasometer::call_transaction_cost(&data);
 		match self.gasometer.record_transaction(transaction_cost) {
@@ -233,9 +237,10 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	/// Get used gas for the current executor, given the price.
 	pub fn used_gas(
 		&self,
-	) -> usize {
+	) -> u64 {
+		assert!(self.gasometer.refunded_gas() >= 0);
 		self.gasometer.total_used_gas() -
-		core::cmp::min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as usize)
+		core::cmp::min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as u64)
                 // 0
 	}
 
@@ -299,7 +304,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	pub fn withdraw(&mut self, address: H160, balance: U256) -> Result<(), ExitError> {
 		let source = self.account_mut(address);
 		if source.basic.balance < balance {
-			return Err(ExitError::OutOfFund.into())
+			return Err(ExitError::OutOfFund)
 		}
 		source.basic.balance -= balance;
 
@@ -346,7 +351,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		scheme: CreateScheme,
 		value: U256,
 		init_code: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		take_l64: bool,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Infallible> {
 		macro_rules! try_or_fail {
@@ -358,7 +363,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: usize) -> usize {
+		fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
@@ -388,7 +393,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let mut substate = self.substate(gas_limit, false);
 		{
 			if let Some(code) = substate.account_mut(address).code.as_ref() {
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
@@ -396,7 +401,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				let code = substate.backend.code(address);
 				substate.account_mut(address).code = Some(code.clone());
 
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
@@ -458,7 +463,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				match substate.gasometer.record_deposit(out.len()) {
 					Ok(()) => {
 						let e = self.merge_succeed(substate);
-						self.state.entry(address).or_insert(Default::default())
+						self.state.entry(address).or_insert_with(Default::default)
 							.code = Some(out);
 						try_or_fail!(e);
 						Capture::Exit((ExitReason::Succeed(s), Some(address), Vec::new()))
@@ -485,12 +490,13 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	fn call_inner(
 		&mut self,
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		take_l64: bool,
 		take_stipend: bool,
@@ -505,7 +511,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: usize) -> usize {
+		fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
@@ -563,9 +569,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		let hook_res = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend);
-		if hook_res.is_some() {
-			match hook_res.as_ref().unwrap() {
+		if let Some(hook_res) = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend) {
+			match &hook_res {
 				Capture::Exit((reason, _return_data)) => {
 					match reason {
 						ExitReason::Succeed(_) => {
@@ -584,7 +589,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				Capture::Trap(_interrupt) => {
 				},
 			}
-			return hook_res.unwrap();
+			return hook_res;
 		}
 
 		let mut runtime = Runtime::new(
@@ -636,7 +641,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn code_size(&self, address: H160) -> U256 {
 		U256::from(
 			self.state.get(&address).and_then(|v| v.code.as_ref().map(|c| c.len()))
-				.unwrap_or(self.backend.code_size(address))
+				.unwrap_or_else(|| self.backend.code_size(address))
 		)
 	}
 
@@ -647,7 +652,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 		let (balance, nonce, code_size) = if let Some(account) = self.state.get(&address) {
 			(account.basic.balance, account.basic.nonce,
-			 account.code.as_ref().map(|c| U256::from(c.len())).unwrap_or(self.code_size(address)))
+			 account.code.as_ref().map(|c| U256::from(c.len())).unwrap_or_else(|| self.code_size(address)))
 		} else {
 			let basic = self.backend.basic(address);
 			(basic.balance, basic.nonce, U256::from(self.backend.code_size(address)))
@@ -662,14 +667,14 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
 				self.backend.keccak256_h256(&c)
 			})
-		}).unwrap_or(self.backend.code_hash(address));
+		}).unwrap_or_else(|| self.backend.code_hash(address));
 		value
 	}
 
 	fn code(&self, address: H160) -> Vec<u8> {
 		self.state.get(&address).and_then(|v| {
 			v.code.clone()
-		}).unwrap_or(self.backend.code(address))
+		}).unwrap_or_else(|| self.backend.code(address))
 	}
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
@@ -678,13 +683,13 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				let s = v.storage.get(&index).cloned();
 
 				if v.reset_storage {
-					Some(s.unwrap_or(U256::zero()))
+					Some(s.unwrap_or_else(U256::zero))
 				} else {
 					s
 				}
 
 			})
-			.unwrap_or(self.backend.storage(address, index))
+			.unwrap_or_else(|| self.backend.storage(address, index))
 	}
 
 	fn original_storage(&self, address: H160, index: U256) -> U256 {
@@ -699,17 +704,15 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn exists(&self, address: H160) -> bool {
 		if self.config.empty_considered_exists {
 			self.state.get(&address).is_some() || self.backend.exists(address)
+		} else if let Some(account) = self.state.get(&address) {
+			account.basic.nonce != U256::zero() ||
+				account.basic.balance != U256::zero() ||
+				account.code.as_ref().map(|c| !c.is_empty()).unwrap_or(false) ||
+				!self.backend.code(address).is_empty()
 		} else {
-			if let Some(account) = self.state.get(&address) {
-				account.basic.nonce != U256::zero() ||
-					account.basic.balance != U256::zero() ||
-					account.code.as_ref().map(|c| c.len() != 0).unwrap_or(false) ||
-					self.backend.code(address).len() != 0
-			} else {
-				self.backend.basic(address).nonce != U256::zero() ||
-					self.backend.basic(address).balance != U256::zero() ||
-					self.backend.code(address).len() != 0
-			}
+			self.backend.basic(address).nonce != U256::zero() ||
+				self.backend.basic(address).balance != U256::zero() ||
+				!self.backend.code(address).is_empty()
 		}
 	}
 
@@ -746,7 +749,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 		self.transfer(Transfer {
 			source: address,
-			target: target,
+			target,
 			value: balance
 		})?;
 		self.account_mut(address).basic.balance = U256::zero();
@@ -762,7 +765,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		scheme: CreateScheme,
 		value: U256,
 		init_code: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Self::CreateInterrupt> {
 		self.create_inner(caller, scheme, value, init_code, target_gas, true)
 	}
@@ -772,7 +775,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
@@ -786,7 +789,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		stack: &Stack
 	) -> Result<(), ExitError> {
 	    if let Some(cost) = gasometer::static_opcode_cost(opcode) {
-		self.gasometer.record_cost(cost as usize)?;
+		self.gasometer.record_cost(cost)?;
             } else {
 		let is_static = self.is_static;
 		let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(

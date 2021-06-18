@@ -106,7 +106,7 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 			self.keccak256_h256(&v.code)
 			//H256::from_slice(Keccak256::digest(&v.code).as_slice())
 		//}).unwrap_or(H256::from_slice(Keccak256::digest(&[]).as_slice()))
-                }).unwrap_or(self.keccak256_h256(&[]))
+                }).unwrap_or_else(|| self.keccak256_h256(&[]))
 	}
 
 	fn code_size(&self, address: H160) -> usize {
@@ -119,8 +119,8 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
-			.map(|v| v.storage.get(&index).cloned().unwrap_or(U256::zero()))
-			.unwrap_or(U256::zero())
+			.map(|v| v.storage.get(&index).cloned().unwrap_or_else(U256::zero))
+			.unwrap_or_else(U256::zero)
 	}
 
 	fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
@@ -129,12 +129,12 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_code_address: H160,
 		_transfer: Option<Transfer>,
 		_input: Vec<u8>,
-		_target_gas: Option<usize>,
+		_target_gas: Option<u64>,
 		_is_static: bool,
 		_take_l64: bool,
 		_take_stipend: bool,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
-		return None;
+		None
 	}
 
 	fn keccak256_h256(&self, data: &[u8]) -> H256 {
@@ -167,7 +167,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 					address, basic, code, storage, reset_storage,
 				} => {
 					let is_empty = {
-						let account = self.state.entry(address).or_insert(Default::default());
+						let account = self.state.entry(address).or_insert_with(Default::default);
 						account.balance = basic.balance;
 						account.nonce = basic.nonce;
 						if let Some(code) = code {
@@ -180,7 +180,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 
 						let zeros = account.storage.iter()
 							.filter(|(_, v)| v == &&U256::zero())
-							.map(|(k, _)| k.clone())
+							.map(|(k, _)| *k)
 							.collect::<Vec<U256>>();
 
 						for zero in zeros {
@@ -197,7 +197,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 
 						account.balance == U256::zero() &&
 							account.nonce == U256::zero() &&
-							account.code.len() == 0
+							!account.code.is_empty()
 					};
 
 					if is_empty && delete_empty {
