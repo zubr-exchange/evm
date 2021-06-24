@@ -21,7 +21,7 @@ impl Valids {
 			let opcode = code[i];
 			match opcode {
 				0x5b => { // Jump Dest
-					valids[i] = 1u8;
+					valids[i] = 1_u8;
 				},
 				0x60..=0x7f => { // Push
 					i += (opcode as usize) - 0x60 + 1;

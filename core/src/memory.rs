@@ -20,7 +20,7 @@ impl Memory {
 	pub const fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
-			effective_len: 0usize,
+			effective_len: 0_usize,
 			limit,
 		}
 	}

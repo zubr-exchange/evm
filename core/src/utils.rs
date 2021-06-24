@@ -12,8 +12,8 @@ pub enum Sign {
 	NoSign,
 }
 
-const SIGN_BIT_MASK: U256 = U256([0xffffffffffffffff, 0xffffffffffffffff,
-								  0xffffffffffffffff, 0x7fffffffffffffff]);
+const SIGN_BIT_MASK: U256 = U256([0xffff_ffff_ffff_ffff, 0xffff_ffff_ffff_ffff,
+								  0xffff_ffff_ffff_ffff, 0x7fff_ffff_ffff_ffff]);
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct I256(pub Sign, pub U256);
@@ -22,7 +22,7 @@ impl I256 {
 	/// Zero value of I256.
 	pub const fn zero() -> I256 { I256(Sign::NoSign, U256::zero()) }
 	/// Minimum value of I256.
-	pub fn min_value() -> I256 { I256(Sign::Minus, (U256::max_value() & SIGN_BIT_MASK) + U256::from(1u64)) }
+	pub fn min_value() -> I256 { I256(Sign::Minus, (U256::max_value() & SIGN_BIT_MASK) + U256::from(1_u64)) }
 }
 
 impl Ord for I256 {
@@ -56,7 +56,7 @@ impl From<U256> for I256 {
 		} else if val & SIGN_BIT_MASK.into() == val {
 			I256(Sign::Plus, val)
 		} else {
-			I256(Sign::Minus, !val + U256::from(1u64))
+			I256(Sign::Minus, !val + U256::from(1_u64))
 		}
 	}
 }
@@ -69,7 +69,7 @@ impl Into<U256> for I256 {
 		} else if sign == Sign::Plus {
 			self.1
 		} else {
-			!self.1 + U256::from(1u64)
+			!self.1 + U256::from(1_u64)
 		}
 	}
 }
@@ -82,7 +82,7 @@ impl Div for I256 {
 			return I256::zero();
 		}
 
-		if self == I256::min_value() && other == I256(Sign::Minus, U256::from(1u64)) {
+		if self == I256::min_value() && other == I256(Sign::Minus, U256::from(1_u64)) {
 			return I256::min_value();
 		}
 

@@ -31,7 +31,7 @@ pub fn calldataload(state: &mut Machine) -> Control {
 	let index = as_usize_or_fail!(index);
 	let len = if index > state.data.len() { 0 } else { min(32, state.data.len() - index) };
 
-	let mut load = [0u8; 32];
+	let mut load = [0_u8; 32];
 	load[0..len].copy_from_slice(&state.data[index..index + len]);
 
 	push!(state, H256::from(load));

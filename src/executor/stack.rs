@@ -106,7 +106,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	#[must_use]
 	pub fn gas() -> usize {
 		//self.gasometer.gas()
-                12341234
+                12_341_234
 	}
 
 	/// Merge a substate executor that succeeded.
