@@ -294,8 +294,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	/// Get account nonce.
 	#[must_use]
 	pub fn nonce(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.nonce)
-			.unwrap_or(self.backend.basic(address).nonce)
+		self.state.get(&address).map_or(self.backend.basic(address).nonce, |v| v.basic.nonce)
 	}
 
 	/// Withdraw balance from address.
@@ -636,8 +635,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	}
 
 	fn balance(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.balance)
-			.unwrap_or(self.backend.basic(address).balance)
+		self.state.get(&address).map_or(self.backend.basic(address).balance, |v| v.basic.balance)
 	}
 
 	fn code_size(&self, address: H160) -> U256 {
@@ -652,13 +650,15 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 			return H256::default()
 		}
 
-		let (balance, nonce, code_size) = if let Some(account) = self.state.get(&address) {
-			(account.basic.balance, account.basic.nonce,
-			 account.code.as_ref().map(|c| U256::from(c.len())).unwrap_or(self.code_size(address)))
-		} else {
+		let (balance, nonce, code_size) = self.state.get(&address).map_or_else(|| {
 			let basic = self.backend.basic(address);
 			(basic.balance, basic.nonce, U256::from(self.backend.code_size(address)))
-		};
+		}, |account| 
+			(
+				account.basic.balance, account.basic.nonce,
+				account.code.as_ref().map_or(self.code_size(address), |c| U256::from(c.len()))
+			)
+		);
 
 		if balance == U256::zero() && nonce == U256::zero() && code_size == U256::zero() {
 			return H256::default()
@@ -707,16 +707,16 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		if self.config.empty_considered_exists {
 			self.state.get(&address).is_some() || self.backend.exists(address)
 		} else {
-			if let Some(account) = self.state.get(&address) {
-				account.basic.nonce != U256::zero() ||
-					account.basic.balance != U256::zero() ||
-					account.code.as_ref().map(|c| c.len() != 0).unwrap_or(false) ||
-					self.backend.code(address).len() != 0
-			} else {
-				self.backend.basic(address).nonce != U256::zero() ||
+			self.state.get(&address).map_or_else(|| 
+					self.backend.basic(address).nonce != U256::zero() ||
 					self.backend.basic(address).balance != U256::zero() ||
-					self.backend.code(address).len() != 0
-			}
+					!self.backend.code(address).is_empty(), 
+				|account| 
+					account.basic.nonce != U256::zero() ||
+					account.basic.balance != U256::zero() ||
+					account.code.as_ref().map_or(false, |c| !c.is_empty()) ||
+					!self.backend.code(address).is_empty()
+			)
 		}
 	}
 

@@ -57,11 +57,7 @@ impl Memory {
 			return Ok(())
 		}
 
-		if let Some(end) = offset.checked_add(len) {
-			self.resize_end(end)
-		} else {
-			Err(ExitError::InvalidRange)
-		}
+		offset.checked_add(len).map_or(Err(ExitError::InvalidRange), |end| self.resize_end(end))
 	}
 
 	/// Resize the memory, making it cover to `end`, with 32 bytes as the step.
@@ -118,8 +114,7 @@ impl Memory {
 	) -> Result<(), ExitFatal> {
 		let target_size = target_size.unwrap_or(value.len());
 
-		if offset.checked_add(target_size)
-			.map(|pos| pos > self.limit).unwrap_or(true)
+		if offset.checked_add(target_size).map_or(true, |pos| pos > self.limit)
 		{
 			return Err(ExitFatal::NotSupported)
 		}
@@ -145,16 +140,14 @@ impl Memory {
 		len: usize,
 		data: &[u8]
 	) -> Result<(), ExitFatal> {
-		let data = if let Some(end) = data_offset.checked_add(len) {
+		let data_by_offset = data_offset.checked_add(len).map_or(&[][..], |end| {
 			if data_offset > data.len() {
-				&[]
+				&[][..]
 			} else {
 				&data[data_offset..min(end, data.len())]
 			}
-		} else {
-			&[]
-		};
+		});
 
-		self.set(memory_offset, data, Some(len))
+		self.set(memory_offset, data_by_offset, Some(len))
 	}
 }
