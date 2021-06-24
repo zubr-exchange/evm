@@ -213,6 +213,8 @@ pub struct Config {
 	pub has_self_balance: bool,
 	/// Has ext code hash.
 	pub has_ext_code_hash: bool,
+	/// Whether the gasometer is running in estimate mode.
+	pub estimate: bool,
 }
 
 
@@ -256,6 +258,7 @@ impl Config {
 			has_chain_id: false,
 			has_self_balance: false,
 			has_ext_code_hash: false,
+			estimate: false,
 		}
 	}
 
@@ -296,6 +299,7 @@ impl Config {
 			has_chain_id: true,
 			has_self_balance: true,
 			has_ext_code_hash: true,
+			estimate: false,
 		}
 	}
 
