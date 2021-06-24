@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{vec,vec::Vec};
 
 /// Mapping of valid jump destination from code.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -13,8 +13,7 @@ impl Valids {
 	/// Create a new valid mapping from given code bytes.
 	#[must_use]
 	pub fn new(code: &[u8]) -> Self {
-		let mut valids: Vec<u8> = Vec::with_capacity(code.len());
-		valids.resize(code.len(), 0u8);
+		let mut valids: Vec<u8> = vec![0; code.len()];
 
 		let mut i = 0;
 		while i < code.len() {

@@ -1,5 +1,5 @@
 use core::cmp::{min, max};
-use alloc::vec::Vec;
+use alloc::{vec,vec::Vec};
 use crate::{ExitError, ExitFatal};
 
 /// A sequencial memory. It uses Rust's `Vec` for internal
@@ -88,8 +88,7 @@ impl Memory {
 	/// the program can run out of memory, or it can overflow.
 	#[must_use]
 	pub fn get(&self, offset: usize, size: usize) -> Vec<u8> {
-		let mut ret = Vec::with_capacity(size);
-		ret.resize(size, 0);
+		let mut ret = vec![0; size];
 
 		if offset >= self.data.len() {
 			return ret;

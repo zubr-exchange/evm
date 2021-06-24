@@ -7,7 +7,7 @@ mod serde_vec_u256 {
 	use alloc::{fmt, vec::Vec};
 	use crate::U256;
 
-	pub fn serialize<S: Serializer>(data: &Vec<U256>, serializer: S) -> Result<S::Ok, S::Error>
+	pub fn serialize<S: Serializer>(data: &[U256], serializer: S) -> Result<S::Ok, S::Error>
 	{
 		let (prefix, bytes, sufix) = unsafe { data.align_to::<u8>() };
 		assert_eq!(prefix.len(), 0);
