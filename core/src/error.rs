@@ -23,7 +23,7 @@ pub enum ExitReason {
 	Succeed(ExitSucceed),
 	/// Machine returns a normal EVM error.
 	Error(ExitError),
-	/// Machine encountered an explict revert.
+	/// Machine encountered an explicit revert.
 	Revert(ExitRevert),
 	/// Machine encountered an error that is not supposed to be normal EVM
 	/// errors, such as requiring too much memory to execute.
@@ -69,11 +69,11 @@ impl ExitReason {
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitSucceed {
-	/// Machine encountered an explict stop.
+	/// Machine encountered an explicit stop.
 	Stopped,
-	/// Machine encountered an explict return.
+	/// Machine encountered an explicit return.
 	Returned,
-	/// Machine encountered an explict suicide.
+	/// Machine encountered an explicit suicide.
 	Suicided,
 }
 
@@ -88,7 +88,7 @@ impl From<ExitSucceed> for ExitReason {
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitRevert {
-	/// Machine encountered an explict revert.
+	/// Machine encountered an explicit revert.
 	Reverted,
 }
 
@@ -120,8 +120,8 @@ pub enum ExitError {
 	/// Create init code exceeds limit (runtime).
 	CreateContractLimit,
 
-	///	An opcode accesses external information, but the request is off offset
-	///	limit (runtime).
+	/// An opcode accesses external information, but the request is off offset
+	/// limit (runtime).
 	OutOfOffset,
 	/// Execution runs out of gas (runtime).
 	OutOfGas,
@@ -152,7 +152,7 @@ pub enum ExitFatal {
 	NotSupported,
 	/// The trap (interrupt) is unhandled.
 	UnhandledInterrupt,
-	/// The environment explictly set call errors as fatal error.
+	/// The environment explicitly set call errors as fatal error.
 	CallErrorAsFatal(ExitError),
 
 	/// Other fatal errors.

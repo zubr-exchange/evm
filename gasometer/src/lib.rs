@@ -89,13 +89,13 @@ impl<'config> Gasometer<'config> {
 		}
 	}
 
-	/// Explictly fail the gasometer with out of gas. Return `OutOfGas` error.
+	/// Explicitly fail the gasometer with out of gas. Return `OutOfGas` error.
 	pub fn fail(&mut self) -> ExitError {
 		self.inner = Err(ExitError::OutOfGas);
 		ExitError::OutOfGas
 	}
 
-	/// Record an explict cost.
+	/// Record an explicit cost.
 	pub fn record_cost(
 		&mut self,
 		cost: usize
@@ -110,7 +110,7 @@ impl<'config> Gasometer<'config> {
 		Ok(())
 	}
 
-	/// Record an explict refund.
+	/// Record an explicit refund.
 	pub fn record_refund(
 		&mut self,
 		refund: isize,
