@@ -463,7 +463,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				//match substate.gasometer.record_deposit(out.len()) {
 				//	Ok(()) => {
 						let e = self.merge_succeed(substate);
-						self.state.entry(address).or_insert(Default::default())
+						self.state.entry(address).or_insert_with(Default::default)
 							.code = Some(out);
 						try_or_fail!(e);
 						Capture::Exit((ExitReason::Succeed(s), Some(address), Vec::new()))
@@ -640,8 +640,8 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 	fn code_size(&self, address: H160) -> U256 {
 		U256::from(
-			self.state.get(&address).and_then(|v| v.code.as_ref().map(|c| c.len()))
-				.unwrap_or(self.backend.code_size(address))
+			self.state.get(&address).and_then(|v| v.code.as_ref()
+				.map_or_else(|| self.backend.code_size(address), Vec::len))
 		)
 	}
 
@@ -669,14 +669,14 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
 				self.backend.keccak256_h256(&c)
 			})
-		}).unwrap_or(self.backend.code_hash(address));
+		}).unwrap_or_else(|| self.backend.code_hash(address));
 		value
 	}
 
 	fn code(&self, address: H160) -> Vec<u8> {
 		self.state.get(&address).and_then(|v| {
 			v.code.clone()
-		}).unwrap_or(self.backend.code(address))
+		}).unwrap_or_else(|| self.backend.code(address))
 	}
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
@@ -685,13 +685,13 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				let s = v.storage.get(&index).cloned();
 
 				if v.reset_storage {
-					Some(s.unwrap_or(U256::zero()))
+					Some(s.unwrap_or_else(U256::zero))
 				} else {
 					s
 				}
 
 			})
-			.unwrap_or(self.backend.storage(address, index))
+			.unwrap_or_else(|| self.backend.storage(address, index))
 	}
 
 	fn original_storage(&self, address: H160, index: U256) -> U256 {

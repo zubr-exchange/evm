@@ -169,7 +169,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 					address, basic, code, storage, reset_storage,
 				} => {
 					let is_empty = {
-						let account = self.state.entry(address).or_insert(Default::default());
+						let account = self.state.entry(address).or_insert_with(Default::default);
 						account.balance = basic.balance;
 						account.nonce = basic.nonce;
 						if let Some(code) = code {
