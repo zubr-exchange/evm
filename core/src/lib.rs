@@ -127,30 +127,29 @@ impl Machine {
 	pub fn step(&mut self) -> Result<(), Capture<ExitReason, Trap>> {
 		let position = *self.position.as_ref().map_err(|reason| Capture::Exit(reason.clone()))?;
 
-		match self.code.get(position).map(|v| Opcode(*v)) {
-			Some(opcode) => {
-				match eval(self, opcode, position) {
-					Control::Continue(p) => {
-						self.position = Ok(position + p);
-						Ok(())
-					},
-					Control::Exit(e) => {
-						self.position = Err(e.clone());
-						Err(Capture::Exit(e))
-					},
-					Control::Jump(p) => {
-						self.position = Ok(p);
-						Ok(())
-					},
-					Control::Trap(opcode) => {
-						self.position = Ok(position + 1);
-						Err(Capture::Trap(opcode))
-					},
-				}
+		let opcode = if let Some(opcode) = self.code.get(position).map(|v| Opcode(*v)) {
+			opcode
+		} else {
+			self.position = Err(ExitSucceed::Stopped.into());
+			return Err(Capture::Exit(ExitSucceed::Stopped.into()))
+		};
+
+		match eval(self, opcode, position) {
+			Control::Continue(p) => {
+				self.position = Ok(position + p);
+				Ok(())
 			},
-			None => {
-				self.position = Err(ExitSucceed::Stopped.into());
-				Err(Capture::Exit(ExitSucceed::Stopped.into()))
+			Control::Exit(e) => {
+				self.position = Err(e.clone());
+				Err(Capture::Exit(e))
+			},
+			Control::Jump(p) => {
+				self.position = Ok(p);
+				Ok(())
+			},
+			Control::Trap(opcode) => {
+				self.position = Ok(position + 1);
+				Err(Capture::Trap(opcode))
 			},
 		}
 	}
