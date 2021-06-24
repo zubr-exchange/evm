@@ -23,6 +23,8 @@ pub struct StackAccount {
 	pub reset_storage: bool,
 }
 
+type PrecompileResult = Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>;
+
 /// Stack-based executor.
 #[derive(Clone)]
 pub struct StackExecutor<'backend, 'config, B> {
@@ -32,20 +34,20 @@ pub struct StackExecutor<'backend, 'config, B> {
 	state: BTreeMap<H160, StackAccount>,
 	deleted: BTreeSet<H160>,
 	logs: Vec<Log>,
-	precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+	precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
 	is_static: bool,
 	depth: Option<usize>,
 }
 
-fn no_precompile(
+const fn no_precompile(
 	_address: H160,
 	_input: &[u8],
 	_target_gas: Option<usize>
-) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>> {
+) -> PrecompileResult {
 	None
 }
 
-impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
+impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, B> {
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
@@ -60,7 +62,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		backend: &'backend B,
 		_gas_limit: usize,
 		config: &'config Config,
-		precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+		precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
 	) -> Self {
 		Self {
 			backend,
@@ -69,7 +71,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			deleted: BTreeSet::new(),
 			config,
 			logs: Vec::new(),
-			precompile: precompile,
+			precompile,
 			is_static: false,
 			depth: None,
 		}
@@ -110,9 +112,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that succeeded.
-	pub fn merge_succeed<'obackend, 'oconfig, OB>(
+	pub fn merge_succeed<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 		self.deleted.append(&mut substate.deleted);
@@ -124,9 +126,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that reverted.
-	pub fn merge_revert<'obackend, 'oconfig, OB>(
+	pub fn merge_revert<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -135,9 +137,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that failed.
-	pub fn merge_fail<'obackend, 'oconfig, OB>(
+	pub fn merge_fail<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -667,7 +669,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		let value = self.state.get(&address).and_then(|v| {
 			v.code.as_ref().map(|c| {
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
-				self.backend.keccak256_h256(&c)
+				self.backend.keccak256_h256(c)
 			})
 		}).unwrap_or_else(|| self.backend.code_hash(address));
 		value
@@ -753,7 +755,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 		self.transfer(&Transfer {
 			source: address,
-			target: target,
+			target,
 			value: balance
 		})?;
 		self.account_mut(address).basic.balance = U256::zero();

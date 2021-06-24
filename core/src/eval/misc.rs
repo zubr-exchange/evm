@@ -121,16 +121,16 @@ pub fn jumpi(state: &mut Machine) -> Control {
 	pop_u256!(state, dest, value);
 	let dest = as_usize_or_fail!(dest, ExitError::InvalidJump);
 
-	if value != U256::zero() {
+	if value == U256::zero() {
+		trace_op!("JumpI: skipped");
+		Control::Continue(1)
+	} else {
 		trace_op!("JumpI: {}", dest);
 		if state.valids.is_valid(dest) {
 			Control::Jump(dest)
 		} else {
 			Control::Exit(ExitError::InvalidJump.into())
 		}
-	} else {
-		trace_op!("JumpI: skipped");
-		Control::Continue(1)
 	}
 }
 

@@ -136,11 +136,11 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_take_l64: bool,
 		_take_stipend: bool,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
-		return None;
+		None
 	}
 
 	fn keccak256_h256(&self, data: &[u8]) -> H256 {
-		H256::from_slice(Keccak256::digest(&data).as_slice())
+		H256::from_slice(Keccak256::digest(data).as_slice())
 	}
 
 	fn keccak256_h256_v(&self, data: &[&[u8]]) -> H256 {
@@ -182,7 +182,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 
 						let zeros = account.storage.iter()
 							.filter(|(_, v)| v == &&U256::zero())
-							.map(|(k, _)| k.clone())
+							.map(|(k, _)| *k)
 							.collect::<Vec<U256>>();
 
 						for zero in zeros {

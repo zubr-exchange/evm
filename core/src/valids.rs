@@ -31,7 +31,7 @@ impl Valids {
 			i += 1;
 		}
 
-		Valids{ data: valids }
+		Self{ data: valids }
 	}
 
 	/// Get the length of the valid mapping. This is the same as the
