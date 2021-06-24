@@ -301,7 +301,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	pub fn withdraw(&mut self, address: H160, balance: U256) -> Result<(), ExitError> {
 		let source = self.account_mut(address);
 		if source.basic.balance < balance {
-			return Err(ExitError::OutOfFund.into())
+			return Err(ExitError::OutOfFund)
 		}
 		source.basic.balance -= balance;
 
