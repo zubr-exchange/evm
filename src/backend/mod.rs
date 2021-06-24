@@ -103,6 +103,7 @@ pub trait Backend {
 	fn create(&self, scheme: &CreateScheme, address: &H160);
 
 	/// Hook on Solidity's call
+	#[allow(clippy::too_many_arguments)]
 	fn call_inner(&self,
 		code_address: H160,
 		transfer: Option<Transfer>,

@@ -1,3 +1,5 @@
+#![allow(clippy::let_underscore_drop)]
+
 use core::convert::Infallible;
 use core::cmp::min;
 use alloc::vec::Vec;
@@ -339,6 +341,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	
+	#[allow(clippy::too_many_lines)]
 	fn create_inner(
 		&mut self,
 		caller: H160,
@@ -484,6 +488,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	fn call_inner(
 		&mut self,
 		code_address: H160,

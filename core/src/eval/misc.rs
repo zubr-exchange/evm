@@ -97,6 +97,7 @@ pub fn mstore8(state: &mut Machine) -> Control {
 	trace_op!("MStore8: {}, {}", index, value);
 	let index = as_usize_or_fail!(index);
 	try_or_fail!(state.memory.resize_offset(index, 1));
+	#[allow(clippy::cast_possible_truncation)]
 	let value = (value.low_u32() & 0xff) as u8;
 	match state.memory.set(index, &[value], Some(1)) {
 		Ok(()) => Control::Continue(1),

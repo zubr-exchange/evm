@@ -1,3 +1,5 @@
+#![allow(clippy::use_self)]
+
 use fixed_hash::{construct_fixed_hash, impl_fixed_hash_conversions};
 use uint::{construct_uint};
 

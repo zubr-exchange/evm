@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation)]
+
 use crate::U256;
 use crate::utils::{Sign, I256};
 

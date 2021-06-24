@@ -1,3 +1,4 @@
+#![allow(clippy::use_self)]
 /// Opcode enum. One-to-one corresponding to an `u8` value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Opcode(pub u8);

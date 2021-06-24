@@ -1,8 +1,11 @@
+#![allow(clippy::use_self)]
+
 use core::ops::{Rem, Div};
 use core::cmp::Ordering;
 use crate::U256;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[allow(clippy::pub_enum_variant_names)]
 pub enum Sign {
 	Plus,
 	Minus,
@@ -24,6 +27,7 @@ impl I256 {
 
 impl Ord for I256 {
 	fn cmp(&self, other: &I256) -> Ordering {
+		#[allow(clippy::match_same_arms)]
 		match (self.0, other.0) {
 			(Sign::NoSign, Sign::NoSign) => Ordering::Equal,
 			(Sign::NoSign, Sign::Plus) => Ordering::Less,
@@ -56,6 +60,7 @@ impl From<U256> for I256 {
 		}
 	}
 }
+#[allow(clippy::from_over_into)]
 impl Into<U256> for I256 {
 	fn into(self) -> U256 {
 		let sign = self.0;
