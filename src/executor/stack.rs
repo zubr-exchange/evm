@@ -393,7 +393,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let mut substate = self.substate(gas_limit, false);
 		{
 			if let Some(code) = substate.account_mut(address).code.as_ref() {
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
@@ -401,7 +401,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				let code = substate.backend.code(address);
 				substate.account_mut(address).code = Some(code.clone());
 
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
