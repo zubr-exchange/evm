@@ -76,6 +76,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Create a substate executor from the current executor.
+	#[must_use]
 	pub fn substate(&self, _gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, B> {
 		Self {
 			backend: self.backend,
@@ -102,7 +103,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get remaining gas.
-	pub fn gas(&self) -> usize {
+	#[must_use]
+	pub fn gas() -> usize {
 		//self.gasometer.gas()
                 12341234
 	}
@@ -232,20 +234,19 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get used gas for the current executor, given the price.
-	pub fn used_gas(
-		&self,
-	) -> usize {
+	#[must_use]
+	pub fn used_gas() -> usize {
 		//self.gasometer.total_used_gas() -
 		//	min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as usize)
                 0
 	}
 
 	/// Get fee needed for the current executor, given the price.
+	#[must_use]
 	pub fn fee(
-		&self,
 		price: U256,
 	) -> U256 {
-		let used_gas = self.used_gas();
+		let used_gas = Self::used_gas();
 		U256::from(used_gas) * price
 	}
 
@@ -291,6 +292,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get account nonce.
+	#[must_use]
 	pub fn nonce(&self, address: H160) -> U256 {
 		self.state.get(&address).map(|v| v.basic.nonce)
 			.unwrap_or(self.backend.basic(address).nonce)
@@ -314,7 +316,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Transfer balance with the given struct.
-	pub fn transfer(&mut self, transfer: Transfer) -> Result<(), ExitError> {
+	pub fn transfer(&mut self, transfer: &Transfer) -> Result<(), ExitError> {
 		self.withdraw(transfer.source, transfer.value)?;
 		self.deposit(transfer.target, transfer.value);
 
@@ -322,6 +324,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get the create address from given scheme.
+	#[must_use]
 	pub fn create_address(&self, scheme: CreateScheme) -> H160 {
 		match scheme {
 			CreateScheme::Create2 { caller, code_hash, salt } => {
@@ -361,7 +364,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: usize) -> usize {
+		const fn l64(gas: usize) -> usize {
 			gas - gas / 64
 		}
 
@@ -424,7 +427,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			target: address,
 			value,
 		};
-		match substate.transfer(transfer) {
+		match substate.transfer(&transfer) {
 			Ok(()) => (),
 			Err(e) => {
 				let _ = self.merge_revert(substate);
@@ -509,7 +512,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 //			}
 //		}
 
-		fn l64(gas: usize) -> usize {
+		const fn l64(gas: usize) -> usize {
 			gas - gas / 64
 		}
 
@@ -544,7 +547,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let transfer_clone = transfer.clone();
 
 		if let Some(transfer) = transfer {
-			match substate.transfer(transfer) {
+			match substate.transfer(&transfer) {
 				Ok(()) => (),
 				Err(e) => {
 					let _ = self.merge_revert(substate);
@@ -748,7 +751,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
 		let balance = self.balance(address);
 
-		self.transfer(Transfer {
+		self.transfer(&Transfer {
 			source: address,
 			target: target,
 			value: balance

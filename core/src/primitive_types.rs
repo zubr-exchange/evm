@@ -185,6 +185,7 @@ impl U256 {
 		buffer.reverse();
 	}
 
+	#[must_use]
 	pub fn from_big_endian_fast(buffer: &[u8]) -> U256 {
 		assert!(32 >= buffer.len());
 

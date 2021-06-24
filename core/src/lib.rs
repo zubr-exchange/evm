@@ -58,15 +58,18 @@ pub struct Machine {
 
 impl Machine {
 	/// Reference of machine stack.
-	pub fn stack(&self) -> &Stack { &self.stack }
+	#[must_use]
+	pub const fn stack(&self) -> &Stack { &self.stack }
 	/// Mutable reference of machine stack.
 	pub fn stack_mut(&mut self) -> &mut Stack { &mut self.stack }
 	/// Reference of machine memory.
-	pub fn memory(&self) -> &Memory { &self.memory }
+	#[must_use]
+	pub const fn memory(&self) -> &Memory { &self.memory }
 	/// Mutable reference of machine memory.
 	pub fn memory_mut(&mut self) -> &mut Memory { &mut self.memory }
 
 	/// Create a new machine with given code and data.
+	#[must_use]
 	pub fn new(
 		code: Vec<u8>,
 		data: Vec<u8>,
@@ -92,6 +95,7 @@ impl Machine {
 	}
 
 	/// Inspect the machine's next opcode and current stack.
+	#[must_use]
 	pub fn inspect(&self) -> Option<(Opcode, &Stack)> {
 		let position = match self.position {
 			Ok(position) => position,
@@ -101,6 +105,7 @@ impl Machine {
 	}
 
 	/// Copy and get the return value of the machine, if any.
+	#[must_use]
 	pub fn return_value(&self) -> Vec<u8> {
 		self.memory.get(
 			self.return_range.start,

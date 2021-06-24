@@ -56,6 +56,7 @@ pub struct MemoryBackend<'vicinity> {
 
 impl<'vicinity> MemoryBackend<'vicinity> {
 	/// Create a new memory backend.
+	#[must_use]
 	pub fn new(vicinity: &'vicinity MemoryVicinity, state: BTreeMap<H160, MemoryAccount>) -> Self {
 		Self {
 			vicinity,
@@ -65,7 +66,8 @@ impl<'vicinity> MemoryBackend<'vicinity> {
 	}
 
 	/// Get the underlying `BTreeMap` storing the state.
-	pub fn state(&self) -> &BTreeMap<H160, MemoryAccount> {
+	#[must_use]
+	pub const fn state(&self) -> &BTreeMap<H160, MemoryAccount> {
 		&self.state
 	}
 }

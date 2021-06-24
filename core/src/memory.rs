@@ -16,7 +16,8 @@ pub struct Memory {
 
 impl Memory {
 	/// Create a new memory with the given limit.
-	pub fn new(limit: usize) -> Self {
+	#[must_use]
+	pub const fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
 			effective_len: 0usize,
@@ -25,21 +26,25 @@ impl Memory {
 	}
 
 	/// Memory limit.
-	pub fn limit(&self) -> usize {
+	#[must_use]
+	pub const fn limit(&self) -> usize {
 		self.limit
 	}
 
 	/// Get the length of the current memory range.
+	#[must_use]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
 
 	/// Get the effective length.
-	pub fn effective_len(&self) -> usize {
+	#[must_use]
+	pub const fn effective_len(&self) -> usize {
 		self.effective_len
 	}
 
 	/// Return true if current effective memory range is zero.
+	#[must_use]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
@@ -85,6 +90,7 @@ impl Memory {
 	///
 	/// Value of `size` is considered trusted. If they're too large,
 	/// the program can run out of memory, or it can overflow.
+	#[must_use]
 	pub fn get(&self, offset: usize, size: usize) -> Vec<u8> {
 		let mut ret = Vec::with_capacity(size);
 		ret.resize(size, 0);

@@ -60,7 +60,8 @@ pub struct Stack {
 
 impl Stack {
 	/// Create a new stack with given limit.
-	pub fn new(limit: usize) -> Self {
+	#[must_use]
+	pub const fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
 			limit,
@@ -68,11 +69,13 @@ impl Stack {
 	}
 
 	/// Stack limit.
-	pub fn limit(&self) -> usize {
+	#[must_use]
+	pub const fn limit(&self) -> usize {
 		self.limit
 	}
 
 	/// Stack length.
+	#[must_use]
 	#[allow(clippy::len_without_is_empty)]
 	pub fn len(&self) -> usize {
 		self.data.len()

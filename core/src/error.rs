@@ -32,35 +32,27 @@ pub enum ExitReason {
 
 impl ExitReason {
 	/// Whether the exit is succeeded.
-	pub fn is_succeed(&self) -> bool {
-		match self {
-			Self::Succeed(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_succeed(&self) -> bool {
+		matches!(self, Self::Succeed(_))
 	}
 
 	/// Whether the exit is error.
-	pub fn is_error(&self) -> bool {
-		match self {
-			Self::Error(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_error(&self) -> bool {
+		matches!(self, Self::Error(_))
 	}
 
 	/// Whether the exit is revert.
-	pub fn is_revert(&self) -> bool {
-		match self {
-			Self::Revert(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_revert(&self) -> bool {
+		matches!(self, Self::Revert(_))
 	}
 
 	/// Whether the exit is fatal.
-	pub fn is_fatal(&self) -> bool {
-		match self {
-			Self::Fatal(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_fatal(&self) -> bool {
+		matches!(self, Self::Fatal(_))
 	}
 }
 
