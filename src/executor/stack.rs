@@ -642,8 +642,8 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 	fn code_size(&self, address: H160) -> U256 {
 		U256::from(
-			self.state.get(&address).and_then(|v| v.code.as_ref()
-				.map_or_else(|| self.backend.code_size(address), Vec::len))
+			self.state.get(&address).and_then(|v| v.code.as_ref().map(Vec::len))
+				.unwrap_or_else(|| self.backend.code_size(address))
 		)
 	}
 
