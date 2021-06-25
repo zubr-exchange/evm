@@ -103,13 +103,48 @@ impl Machine {
 	}
 
 	/// Loop stepping the machine, until it stops.
-	pub fn run(&mut self) -> Capture<ExitReason, Trap> {
-		loop {
-			match self.step() {
-				Ok(()) => (),
-				Err(res) => return res,
+	pub fn run<F>(&mut self, max_steps: u64, mut pre_validate: F) -> (u64, Capture<ExitReason, Trap>)
+		where F: FnMut(Opcode, &Stack) -> Result<(), ExitError>
+	{
+		for step in 0..max_steps {
+			let position = match self.position {
+				Ok(position) => position,
+				Err(reason) => return (step, Capture::Exit(reason))
+			};
+
+			let opcode = match self.code.get(position) {
+				Some(opcode) => Opcode(*opcode),
+				None => {
+					self.position = Err(ExitReason::Succeed(ExitSucceed::Stopped));
+					return (step, Capture::Exit(ExitReason::Succeed(ExitSucceed::Stopped)));
+				}
+			};
+
+			if let Err(error) = pre_validate(opcode, &self.stack()) {
+				let reason = ExitReason::from(error);
+				self.exit(reason);
+				return (step, Capture::Exit(reason));
+			}
+
+			match eval(self, opcode, position) {
+				Control::Continue(p) => {
+					self.position = Ok(position + p);
+				},
+				Control::Exit(reason) => {
+					self.exit(reason);
+					return (step, Capture::Exit(reason))
+				},
+				Control::Jump(p) => {
+					self.position = Ok(p);
+				},
+				Control::Trap(opcode) => {
+					self.position = Ok(position + 1);
+					return (step, Capture::Trap(opcode));
+				},
 			}
 		}
+
+		(max_steps, Capture::Exit(ExitReason::StepLimitReached))
 	}
 
 	/// Step the machine, executing one opcode. It then returns.
