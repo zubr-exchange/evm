@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use crate::Opcode;
 
 /// Trap which indicates that an `ExternalOpcode` has to be handled.
@@ -15,10 +14,12 @@ pub enum Capture<E, T> {
 }
 
 /// Exit reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitReason {
+	/// Machine reached a step limit
+	StepLimitReached,
 	/// Machine has succeeded.
 	Succeed(ExitSucceed),
 	/// Machine returns a normal EVM error.
@@ -91,7 +92,7 @@ impl From<ExitRevert> for ExitReason {
 }
 
 /// Exit error reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitError {
@@ -124,9 +125,6 @@ pub enum ExitError {
 	PCUnderflow,
 	/// Attempt to create an empty account (runtime, unused).
 	CreateEmpty,
-
-	/// Other normal errors.
-	Other(Cow<'static, str>),
 }
 
 impl From<ExitError> for ExitReason {
@@ -136,7 +134,7 @@ impl From<ExitError> for ExitReason {
 }
 
 /// Exit fatal reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitFatal {
@@ -146,9 +144,6 @@ pub enum ExitFatal {
 	UnhandledInterrupt,
 	/// The environment explicitly set call errors as fatal error.
 	CallErrorAsFatal(ExitError),
-
-	/// Other fatal errors.
-	Other(Cow<'static, str>),
 }
 
 impl From<ExitFatal> for ExitReason {

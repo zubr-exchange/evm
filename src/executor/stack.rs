@@ -98,7 +98,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 	/// Execute the runtime until it returns.
 	pub fn execute(&mut self, runtime: &mut Runtime) -> ExitReason {
-		match runtime.run(self) {
+		match runtime.run(u64::max_value(), self).1 {
 			Capture::Exit(s) => s,
 			Capture::Trap(_) => unreachable!("Trap is Infallible"),
 		}
@@ -489,6 +489,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 				//self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), None, Vec::new()))
 			},
+			ExitReason::StepLimitReached => { unreachable!() }
 		}
 	}
 
@@ -587,6 +588,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 						},
 						ExitReason::Fatal(_) => {
 						},
+						ExitReason::StepLimitReached => { unreachable!() }
 					}
 				},
 				Capture::Trap(_interrupt) => {
@@ -622,6 +624,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 				//self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), Vec::new()))
 			},
+			ExitReason::StepLimitReached => { unreachable!() }
 		}
 	}
 }
