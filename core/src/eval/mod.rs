@@ -447,6 +447,7 @@ fn eval_external(_state: &mut Machine, opcode: Opcode, _position: usize) -> Cont
 	Control::Trap(opcode)
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn eval(state: &mut Machine, opcode: Opcode, position: usize) -> Control {
 	static TABLE: [fn(state: &mut Machine, opcode: Opcode, position: usize) -> Control; 256] = {
 		let mut table = [eval_external as _; 256];

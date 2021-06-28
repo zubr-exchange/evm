@@ -267,8 +267,8 @@ pub fn create<H: Handler>(
 	};
 
 	match handler.create(runtime.context.address, scheme, value, code, None) {
-		Capture::Exit((reason, address, return_data)) => {
-			save_created_address(runtime, reason, address, return_data, handler)
+		Capture::Exit((reason, address, _return_data)) => {
+			save_created_address(runtime, reason, address, handler)
 		},
 		Capture::Trap(interrupt) => {
 			// The created contract's address will be push by the method save_created_address()
@@ -369,10 +369,10 @@ pub fn save_created_address<'config, H: Handler>(
 	runtime: &mut Runtime,
 	reason : ExitReason,
 	address: Option<H160>,
-	return_data : Vec<u8>,
+	// return_data : Vec<u8>,
 	_handler: & H
 ) -> Control<H> {
-	runtime.return_data_buffer = return_data;
+	// runtime.return_data_buffer = return_data;
 	let create_address: H256 = address.map(|a| a.into()).unwrap_or_default();
 
 	match reason {
@@ -392,6 +392,7 @@ pub fn save_created_address<'config, H: Handler>(
 			push!(runtime, H256::default());
 			Control::Exit(e.into())
 		},
+		ExitReason::StepLimitReached => { unreachable!() }
 	}
 
 }
@@ -454,6 +455,7 @@ pub fn save_return_value<'config, H: Handler>(
 
 					Control::Exit(e.into())
 				},
+				ExitReason::StepLimitReached => { unreachable!() }
 			}
         }
 }

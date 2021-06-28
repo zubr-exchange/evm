@@ -31,7 +31,7 @@ pub fn calldataload(state: &mut Machine) -> Control {
 	let index = as_usize_or_fail!(index);
 	let len = if index > state.data.len() { 0 } else { min(32, state.data.len() - index) };
 
-	let mut load = [0u8; 32];
+	let mut load = [0_u8; 32];
 	load[0..len].copy_from_slice(&state.data[index..index + len]);
 
 	push!(state, H256::from(load));
@@ -97,6 +97,7 @@ pub fn mstore8(state: &mut Machine) -> Control {
 	trace_op!("MStore8: {}, {}", index, value);
 	let index = as_usize_or_fail!(index);
 	try_or_fail!(state.memory.resize_offset(index, 1));
+	#[allow(clippy::cast_possible_truncation)]
 	let value = (value.low_u32() & 0xff) as u8;
 	match state.memory.set(index, &[value], Some(1)) {
 		Ok(()) => Control::Continue(1),
@@ -120,16 +121,16 @@ pub fn jumpi(state: &mut Machine) -> Control {
 	pop_u256!(state, dest, value);
 	let dest = as_usize_or_fail!(dest, ExitError::InvalidJump);
 
-	if value != U256::zero() {
+	if value == U256::zero() {
+		trace_op!("JumpI: skipped");
+		Control::Continue(1)
+	} else {
 		trace_op!("JumpI: {}", dest);
 		if state.valids.is_valid(dest) {
 			Control::Jump(dest)
 		} else {
 			Control::Exit(ExitError::InvalidJump.into())
 		}
-	} else {
-		trace_op!("JumpI: skipped");
-		Control::Continue(1)
 	}
 }
 

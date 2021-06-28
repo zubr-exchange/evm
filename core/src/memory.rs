@@ -1,5 +1,5 @@
 use core::cmp::{min, max};
-use alloc::vec::Vec;
+use alloc::{vec,vec::Vec};
 use crate::{ExitError, ExitFatal};
 
 /// A sequencial memory. It uses Rust's `Vec` for internal
@@ -16,30 +16,35 @@ pub struct Memory {
 
 impl Memory {
 	/// Create a new memory with the given limit.
-	pub fn new(limit: usize) -> Self {
+	#[must_use]
+	pub const fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
-			effective_len: 0usize,
+			effective_len: 0_usize,
 			limit,
 		}
 	}
 
 	/// Memory limit.
-	pub fn limit(&self) -> usize {
+	#[must_use]
+	pub const fn limit(&self) -> usize {
 		self.limit
 	}
 
 	/// Get the length of the current memory range.
+	#[must_use]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
 
 	/// Get the effective length.
-	pub fn effective_len(&self) -> usize {
+	#[must_use]
+	pub const fn effective_len(&self) -> usize {
 		self.effective_len
 	}
 
 	/// Return true if current effective memory range is zero.
+	#[must_use]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
@@ -52,11 +57,7 @@ impl Memory {
 			return Ok(())
 		}
 
-		if let Some(end) = offset.checked_add(len) {
-			self.resize_end(end)
-		} else {
-			Err(ExitError::InvalidRange)
-		}
+		offset.checked_add(len).map_or(Err(ExitError::InvalidRange), |end| self.resize_end(end))
 	}
 
 	/// Resize the memory, making it cover to `end`, with 32 bytes as the step.
@@ -85,9 +86,9 @@ impl Memory {
 	///
 	/// Value of `size` is considered trusted. If they're too large,
 	/// the program can run out of memory, or it can overflow.
+	#[must_use]
 	pub fn get(&self, offset: usize, size: usize) -> Vec<u8> {
-		let mut ret = Vec::with_capacity(size);
-		ret.resize(size, 0);
+		let mut ret = vec![0; size];
 
 		if offset >= self.data.len() {
 			return ret;
@@ -112,8 +113,7 @@ impl Memory {
 	) -> Result<(), ExitFatal> {
 		let target_size = target_size.unwrap_or(value.len());
 
-		if offset.checked_add(target_size)
-			.map(|pos| pos > self.limit).unwrap_or(true)
+		if offset.checked_add(target_size).map_or(true, |pos| pos > self.limit)
 		{
 			return Err(ExitFatal::NotSupported)
 		}
@@ -139,16 +139,14 @@ impl Memory {
 		len: usize,
 		data: &[u8]
 	) -> Result<(), ExitFatal> {
-		let data = if let Some(end) = data_offset.checked_add(len) {
+		let data_by_offset = data_offset.checked_add(len).map_or(&[][..], |end| {
 			if data_offset > data.len() {
-				&[]
+				&[][..]
 			} else {
 				&data[data_offset..min(end, data.len())]
 			}
-		} else {
-			&[]
-		};
+		});
 
-		self.set(memory_offset, data, Some(len))
+		self.set(memory_offset, data_by_offset, Some(len))
 	}
 }

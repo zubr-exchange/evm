@@ -1,3 +1,4 @@
+#![allow(clippy::use_self)]
 /// Opcode enum. One-to-one corresponding to an `u8` value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Opcode(pub u8);
@@ -241,12 +242,14 @@ impl Opcode {
 impl Opcode {
 
 	#[inline]
-	pub const fn as_u8(&self) -> u8 {
+	#[must_use]
+	pub const fn as_u8(self) -> u8 {
 		self.0
 	}
 
 	#[inline]
-	pub const fn as_usize(&self) -> usize {
+	#[must_use]
+	pub const fn as_usize(self) -> usize {
 		self.0 as usize
 	}
 }

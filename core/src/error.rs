@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use crate::Opcode;
 
 /// Trap which indicates that an `ExternalOpcode` has to be handled.
@@ -15,15 +14,17 @@ pub enum Capture<E, T> {
 }
 
 /// Exit reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitReason {
+	/// Machine reached a step limit
+	StepLimitReached,
 	/// Machine has succeeded.
 	Succeed(ExitSucceed),
 	/// Machine returns a normal EVM error.
 	Error(ExitError),
-	/// Machine encountered an explict revert.
+	/// Machine encountered an explicit revert.
 	Revert(ExitRevert),
 	/// Machine encountered an error that is not supposed to be normal EVM
 	/// errors, such as requiring too much memory to execute.
@@ -32,35 +33,27 @@ pub enum ExitReason {
 
 impl ExitReason {
 	/// Whether the exit is succeeded.
-	pub fn is_succeed(&self) -> bool {
-		match self {
-			Self::Succeed(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_succeed(&self) -> bool {
+		matches!(self, Self::Succeed(_))
 	}
 
 	/// Whether the exit is error.
-	pub fn is_error(&self) -> bool {
-		match self {
-			Self::Error(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_error(&self) -> bool {
+		matches!(self, Self::Error(_))
 	}
 
 	/// Whether the exit is revert.
-	pub fn is_revert(&self) -> bool {
-		match self {
-			Self::Revert(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_revert(&self) -> bool {
+		matches!(self, Self::Revert(_))
 	}
 
 	/// Whether the exit is fatal.
-	pub fn is_fatal(&self) -> bool {
-		match self {
-			Self::Fatal(_) => true,
-			_ => false,
-		}
+	#[must_use]
+	pub const fn is_fatal(&self) -> bool {
+		matches!(self, Self::Fatal(_))
 	}
 }
 
@@ -69,11 +62,11 @@ impl ExitReason {
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitSucceed {
-	/// Machine encountered an explict stop.
+	/// Machine encountered an explicit stop.
 	Stopped,
-	/// Machine encountered an explict return.
+	/// Machine encountered an explicit return.
 	Returned,
-	/// Machine encountered an explict suicide.
+	/// Machine encountered an explicit suicide.
 	Suicided,
 }
 
@@ -88,7 +81,7 @@ impl From<ExitSucceed> for ExitReason {
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitRevert {
-	/// Machine encountered an explict revert.
+	/// Machine encountered an explicit revert.
 	Reverted,
 }
 
@@ -99,7 +92,7 @@ impl From<ExitRevert> for ExitReason {
 }
 
 /// Exit error reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitError {
@@ -120,8 +113,8 @@ pub enum ExitError {
 	/// Create init code exceeds limit (runtime).
 	CreateContractLimit,
 
-	///	An opcode accesses external information, but the request is off offset
-	///	limit (runtime).
+	/// An opcode accesses external information, but the request is off offset
+	/// limit (runtime).
 	OutOfOffset,
 	/// Execution runs out of gas (runtime).
 	OutOfGas,
@@ -132,9 +125,6 @@ pub enum ExitError {
 	PCUnderflow,
 	/// Attempt to create an empty account (runtime, unused).
 	CreateEmpty,
-
-	/// Other normal errors.
-	Other(Cow<'static, str>),
 }
 
 impl From<ExitError> for ExitReason {
@@ -144,7 +134,7 @@ impl From<ExitError> for ExitReason {
 }
 
 /// Exit fatal reason.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExitFatal {
@@ -152,11 +142,8 @@ pub enum ExitFatal {
 	NotSupported,
 	/// The trap (interrupt) is unhandled.
 	UnhandledInterrupt,
-	/// The environment explictly set call errors as fatal error.
+	/// The environment explicitly set call errors as fatal error.
 	CallErrorAsFatal(ExitError),
-
-	/// Other fatal errors.
-	Other(Cow<'static, str>),
 }
 
 impl From<ExitFatal> for ExitReason {

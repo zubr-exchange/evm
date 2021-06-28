@@ -1,3 +1,5 @@
+#![allow(clippy::let_underscore_drop)]
+
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::convert::Infallible;
@@ -24,7 +26,8 @@ pub struct StackAccount {
 }
 
 type PrecompileOutput = (ExitSucceed, Vec<u8>, u64);
-type PrecompileFn = fn(H160, &[u8], Option<u64>) -> Option<Result<PrecompileOutput, ExitError>>;
+type PrecompileResult = Option<Result<PrecompileOutput, ExitError>>;
+type PrecompileFn = fn(H160, &[u8], Option<u64>) -> PrecompileResult;
 
 /// Stack-based executor.
 #[derive(Clone)]
@@ -40,15 +43,15 @@ pub struct StackExecutor<'backend, 'config, B> {
 	depth: Option<usize>,
 }
 
-fn no_precompile(
+const fn no_precompile(
 	_address: H160,
 	_input: &[u8],
 	_target_gas: Option<u64>
-) -> Option<Result<PrecompileOutput, ExitError>> {
+) -> PrecompileResult {
 	None
 }
 
-impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
+impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, B> {
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
@@ -79,6 +82,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Create a substate executor from the current executor.
+	#[must_use]
 	pub fn substate(&self, gas_limit: u64, is_static: bool) -> StackExecutor<'backend, 'config, B> {
 		Self {
 			backend: self.backend,
@@ -98,16 +102,16 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 
 	/// Execute the runtime until it returns.
 	pub fn execute(&mut self, runtime: &mut Runtime) -> ExitReason {
-		match runtime.run(self) {
+		match runtime.run(u64::max_value(), self).1 {
 			Capture::Exit(s) => s,
 			Capture::Trap(_) => unreachable!("Trap is Infallible"),
 		}
 	}
 
 	/// Get remaining gas.
+	#[must_use]
 	pub fn gas(&self) -> u64 {
-		self.gasometer.gas()
-                // 12341234
+		self.gasometer.gas() // 12341234
 	}
 
 	/// Merge a substate executor that succeeded.
@@ -234,21 +238,20 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
-	/// Get used gas for the current executor, given the price.
-	pub fn used_gas(
-		&self,
-	) -> u64 {
-		assert!(self.gasometer.refunded_gas() >= 0);
-		self.gasometer.total_used_gas() -
-		core::cmp::min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as u64)
-                // 0
+	/// Get used gas for the current executor.
+	#[must_use]
+	#[allow(clippy::cast_sign_loss)]
+	pub fn used_gas(&self) -> u64 {
+		let rg = self.gasometer.refunded_gas();
+		assert!(rg >= 0);
+		let tug = self.gasometer.total_used_gas();
+		tug - core::cmp::min(tug / 2, rg as u64)
+        // 0
 	}
 
 	/// Get fee needed for the current executor, given the price.
-	pub fn fee(
-		&self,
-		price: U256,
-	) -> U256 {
+	#[must_use]
+	pub fn fee(&self, price: U256) -> U256 {
 		let used_gas = self.used_gas();
 		U256::from(used_gas) * price
 	}
@@ -295,9 +298,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get account nonce.
+	#[must_use]
 	pub fn nonce(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.nonce)
-			.unwrap_or(self.backend.basic(address).nonce)
+		self.state.get(&address).map_or(self.backend.basic(address).nonce, |v| v.basic.nonce)
 	}
 
 	/// Withdraw balance from address.
@@ -318,7 +321,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Transfer balance with the given struct.
-	pub fn transfer(&mut self, transfer: Transfer) -> Result<(), ExitError> {
+	pub fn transfer(&mut self, transfer: &Transfer) -> Result<(), ExitError> {
 		self.withdraw(transfer.source, transfer.value)?;
 		self.deposit(transfer.target, transfer.value);
 
@@ -326,6 +329,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get the create address from given scheme.
+	#[must_use]
 	pub fn create_address(&self, scheme: CreateScheme) -> H160 {
 		match scheme {
 			CreateScheme::Create2 { caller, code_hash, salt } => {
@@ -345,6 +349,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	
+	#[allow(clippy::too_many_lines)]
 	fn create_inner(
 		&mut self,
 		caller: H160,
@@ -363,7 +369,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: u64) -> u64 {
+		const fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
@@ -426,7 +432,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			target: address,
 			value,
 		};
-		match substate.transfer(transfer) {
+		match substate.transfer(&transfer) {
 			Ok(()) => (),
 			Err(e) => {
 				let _ = self.merge_revert(substate);
@@ -487,10 +493,12 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), None, Vec::new()))
 			},
+			ExitReason::StepLimitReached => { unreachable!() }
 		}
 	}
 
 	#[allow(clippy::too_many_arguments)]
+	#[allow(clippy::too_many_lines)]
 	fn call_inner(
 		&mut self,
 		code_address: H160,
@@ -511,7 +519,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: u64) -> u64 {
+		const fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
@@ -546,7 +554,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let transfer_clone = transfer.clone();
 
 		if let Some(transfer) = transfer {
-			match substate.transfer(transfer) {
+			match substate.transfer(&transfer) {
 				Ok(()) => (),
 				Err(e) => {
 					let _ = self.merge_revert(substate);
@@ -569,7 +577,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		if let Some(hook_res) = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend) {
+		let hook_res = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend);
+		if let Some(hook_res) = hook_res {
 			match &hook_res {
 				Capture::Exit((reason, _return_data)) => {
 					match reason {
@@ -584,6 +593,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 						},
 						ExitReason::Fatal(_) => {
 						},
+						ExitReason::StepLimitReached => { unreachable!() }
 					}
 				},
 				Capture::Trap(_interrupt) => {
@@ -619,6 +629,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), Vec::new()))
 			},
+			ExitReason::StepLimitReached => { unreachable!() }
 		}
 	}
 }
@@ -634,13 +645,12 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	}
 
 	fn balance(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.balance)
-			.unwrap_or(self.backend.basic(address).balance)
+		self.state.get(&address).map_or(self.backend.basic(address).balance, |v| v.basic.balance)
 	}
 
 	fn code_size(&self, address: H160) -> U256 {
 		U256::from(
-			self.state.get(&address).and_then(|v| v.code.as_ref().map(|c| c.len()))
+			self.state.get(&address).and_then(|v| v.code.as_ref().map(Vec::len))
 				.unwrap_or_else(|| self.backend.code_size(address))
 		)
 	}
@@ -650,13 +660,15 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 			return H256::default()
 		}
 
-		let (balance, nonce, code_size) = if let Some(account) = self.state.get(&address) {
-			(account.basic.balance, account.basic.nonce,
-			 account.code.as_ref().map(|c| U256::from(c.len())).unwrap_or_else(|| self.code_size(address)))
-		} else {
+		let (balance, nonce, code_size) = self.state.get(&address).map_or_else(|| {
 			let basic = self.backend.basic(address);
 			(basic.balance, basic.nonce, U256::from(self.backend.code_size(address)))
-		};
+		}, |account| 
+			(
+				account.basic.balance, account.basic.nonce,
+				account.code.as_ref().map_or(self.code_size(address), |c| U256::from(c.len()))
+			)
+		);
 
 		if balance == U256::zero() && nonce == U256::zero() && code_size == U256::zero() {
 			return H256::default()
@@ -665,7 +677,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		let value = self.state.get(&address).and_then(|v| {
 			v.code.as_ref().map(|c| {
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
-				self.backend.keccak256_h256(&c)
+				self.backend.keccak256_h256(c)
 			})
 		}).unwrap_or_else(|| self.backend.code_hash(address));
 		value
@@ -701,6 +713,8 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		self.backend.storage(address, index)
 	}
 
+	#[allow(clippy::option_if_let_else)]
+	#[allow(clippy::map_unwrap_or)]
 	fn exists(&self, address: H160) -> bool {
 		if self.config.empty_considered_exists {
 			self.state.get(&address).is_some() || self.backend.exists(address)
@@ -710,9 +724,16 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				account.code.as_ref().map(|c| !c.is_empty()).unwrap_or(false) ||
 				!self.backend.code(address).is_empty()
 		} else {
-			self.backend.basic(address).nonce != U256::zero() ||
-				self.backend.basic(address).balance != U256::zero() ||
-				!self.backend.code(address).is_empty()
+			self.state.get(&address).map_or_else(||
+					self.backend.basic(address).nonce != U256::zero() ||
+					self.backend.basic(address).balance != U256::zero() ||
+					!self.backend.code(address).is_empty(), 
+				|account| 
+					account.basic.nonce != U256::zero() ||
+					account.basic.balance != U256::zero() ||
+					account.code.as_ref().map_or(false, |c| !c.is_empty()) ||
+					!self.backend.code(address).is_empty()
+			)
 		}
 	}
 
@@ -747,7 +768,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
 		let balance = self.balance(address);
 
-		self.transfer(Transfer {
+		self.transfer(&Transfer {
 			source: address,
 			target,
 			value: balance
@@ -786,23 +807,23 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		&mut self,
 		context: &Context,
 		opcode: Opcode,
-		stack: &Stack
+		stack: &Stack,
 	) -> Result<(), ExitError> {
-	    if let Some(cost) = gasometer::static_opcode_cost(opcode) {
-		self.gasometer.record_cost(cost)?;
-            } else {
-		let is_static = self.is_static;
-		let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(
-		    context.address,
-		    opcode,
-		    stack,
-		    is_static,
-		    &self.config,
-		    self,
-		)?;
-		self.gasometer.record_dynamic_cost(gas_cost, memory_cost)?;
-	    }
+		if let Some(cost) = gasometer::static_opcode_cost(opcode) {
+			self.gasometer.record_cost(cost)?;
+		} else {
+			let is_static = self.is_static;
+			let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(
+				context.address,
+				opcode,
+				stack,
+				is_static,
+				self.config,
+				self,
+			)?;
+			self.gasometer.record_dynamic_cost(gas_cost, memory_cost)?;
+		}
 
-	    Ok(())
+		Ok(())
 	}
 }

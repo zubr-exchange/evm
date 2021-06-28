@@ -2,6 +2,12 @@
 
 #![deny(warnings)]
 #![forbid(unsafe_code, unused_variables, unused_imports)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(
+	clippy::module_name_repetitions,
+	clippy::missing_errors_doc,
+	clippy::missing_panics_doc
+)]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -132,11 +138,53 @@ impl<'config> Runtime<'config> {
 	/// Loop stepping the runtime until it stops.
 	pub fn run<'a, H: Handler>(
 		&'a mut self,
+		max_steps: u64,
 		handler: &mut H,
-	) -> Capture<ExitReason, Resolve<'a, 'config, H>> {
-		loop {
-			step!(self, handler, return;)
+	) -> (u64, Capture<ExitReason, Resolve<'a, 'config, H>>) {
+		if let Err(e) = self.status {
+			return (0, Capture::Exit(e));
 		}
+
+		let mut steps = 0_u64;
+
+		while steps < max_steps {
+			let (steps_executed, capture) = {
+				let context = &self.context;
+				let pre_validate = |opcode, stack: &Stack| { handler.pre_validate(context, opcode, stack) };
+				self.machine.run(max_steps - steps, pre_validate)
+			};
+			steps += steps_executed;
+
+			match capture {
+				Capture::Exit(ExitReason::StepLimitReached) => {
+					return (steps, Capture::Exit(ExitReason::StepLimitReached));
+				},
+				Capture::Exit(reason) => {
+					self.status = Err(reason);
+					return (steps, Capture::Exit(reason));
+				},
+				Capture::Trap(opcode) => {
+					match eval::eval(self, opcode, handler) {
+						eval::Control::Continue => {},
+						eval::Control::CallInterrupt(interrupt) => {
+							let resolve = ResolveCall::new(self);
+							return (steps, Capture::Trap(Resolve::Call(interrupt, resolve)));
+						},
+						eval::Control::CreateInterrupt(interrupt) => {
+							let resolve = ResolveCreate::new(self);
+							return (steps, Capture::Trap(Resolve::Create(interrupt, resolve)));
+						},
+						eval::Control::Exit(exit) => {
+							self.machine.exit(exit);
+							self.status = Err(exit);
+							return (steps, Capture::Exit(exit));
+						},
+					}
+				},
+			}
+		}
+
+		(steps, Capture::Exit(ExitReason::StepLimitReached))
 	}
 }
 
