@@ -56,6 +56,7 @@ pub struct MemoryBackend<'vicinity> {
 
 impl<'vicinity> MemoryBackend<'vicinity> {
 	/// Create a new memory backend.
+	#[must_use]
 	pub fn new(vicinity: &'vicinity MemoryVicinity, state: BTreeMap<H160, MemoryAccount>) -> Self {
 		Self {
 			vicinity,
@@ -65,7 +66,8 @@ impl<'vicinity> MemoryBackend<'vicinity> {
 	}
 
 	/// Get the underlying `BTreeMap` storing the state.
-	pub fn state(&self) -> &BTreeMap<H160, MemoryAccount> {
+	#[must_use]
+	pub const fn state(&self) -> &BTreeMap<H160, MemoryAccount> {
 		&self.state
 	}
 }
@@ -102,15 +104,15 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 	}
 
 	fn code_hash(&self, address: H160) -> H256 {
-		self.state.get(&address).map(|v| {
+		self.state.get(&address).map_or(self.keccak256_h256(&[]), |v| {
+			//map_or(H256::from_slice(Keccak256::digest(&[]).as_slice())), |v| {
 			self.keccak256_h256(&v.code)
 			//H256::from_slice(Keccak256::digest(&v.code).as_slice())
-		//}).unwrap_or(H256::from_slice(Keccak256::digest(&[]).as_slice()))
-                }).unwrap_or(self.keccak256_h256(&[]))
+		})
 	}
 
 	fn code_size(&self, address: H160) -> usize {
-		self.state.get(&address).map(|v| v.code.len()).unwrap_or(0)
+		self.state.get(&address).map_or(0, |v| v.code.len())
 	}
 
 	fn code(&self, address: H160) -> Vec<u8> {
@@ -119,8 +121,8 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
-			.map(|v| v.storage.get(&index).cloned().unwrap_or(U256::zero()))
-			.unwrap_or(U256::zero())
+			.map_or(U256::zero(), |v| 
+				v.storage.get(&index).cloned().unwrap_or_else(U256::zero))
 	}
 
 	fn create(&self, _scheme: &CreateScheme, _address: &H160) {}
@@ -134,11 +136,11 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_take_l64: bool,
 		_take_stipend: bool,
 	) -> Option<Capture<(ExitReason, Vec<u8>), Infallible>> {
-		return None;
+		None
 	}
 
 	fn keccak256_h256(&self, data: &[u8]) -> H256 {
-		H256::from_slice(Keccak256::digest(&data).as_slice())
+		H256::from_slice(Keccak256::digest(data).as_slice())
 	}
 
 	fn keccak256_h256_v(&self, data: &[&[u8]]) -> H256 {
@@ -167,7 +169,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 					address, basic, code, storage, reset_storage,
 				} => {
 					let is_empty = {
-						let account = self.state.entry(address).or_insert(Default::default());
+						let account = self.state.entry(address).or_insert_with(Default::default);
 						account.balance = basic.balance;
 						account.nonce = basic.nonce;
 						if let Some(code) = code {
@@ -180,7 +182,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 
 						let zeros = account.storage.iter()
 							.filter(|(_, v)| v == &&U256::zero())
-							.map(|(k, _)| k.clone())
+							.map(|(k, _)| *k)
 							.collect::<Vec<U256>>();
 
 						for zero in zeros {
@@ -197,7 +199,7 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 
 						account.balance == U256::zero() &&
 							account.nonce == U256::zero() &&
-							account.code.len() == 0
+							account.code.is_empty()
 					};
 
 					if is_empty && delete_empty {

@@ -1,3 +1,5 @@
+#![allow(clippy::let_underscore_drop)]
+
 use core::convert::Infallible;
 use core::cmp::min;
 use alloc::vec::Vec;
@@ -21,6 +23,8 @@ pub struct StackAccount {
 	pub reset_storage: bool,
 }
 
+type PrecompileResult = Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>;
+
 /// Stack-based executor.
 #[derive(Clone)]
 pub struct StackExecutor<'backend, 'config, B> {
@@ -30,20 +34,20 @@ pub struct StackExecutor<'backend, 'config, B> {
 	state: BTreeMap<H160, StackAccount>,
 	deleted: BTreeSet<H160>,
 	logs: Vec<Log>,
-	precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+	precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
 	is_static: bool,
 	depth: Option<usize>,
 }
 
-fn no_precompile(
+const fn no_precompile(
 	_address: H160,
 	_input: &[u8],
 	_target_gas: Option<usize>
-) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>> {
+) -> PrecompileResult {
 	None
 }
 
-impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
+impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, B> {
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
@@ -58,7 +62,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		backend: &'backend B,
 		_gas_limit: usize,
 		config: &'config Config,
-		precompile: fn(H160, &[u8], Option<usize>) -> Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>,
+		precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
 	) -> Self {
 		Self {
 			backend,
@@ -67,13 +71,14 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			deleted: BTreeSet::new(),
 			config,
 			logs: Vec::new(),
-			precompile: precompile,
+			precompile,
 			is_static: false,
 			depth: None,
 		}
 	}
 
 	/// Create a substate executor from the current executor.
+	#[must_use]
 	pub fn substate(&self, _gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, B> {
 		Self {
 			backend: self.backend,
@@ -100,15 +105,16 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get remaining gas.
-	pub fn gas(&self) -> usize {
+	#[must_use]
+	pub fn gas() -> usize {
 		//self.gasometer.gas()
-                12341234
+                12_341_234
 	}
 
 	/// Merge a substate executor that succeeded.
-	pub fn merge_succeed<'obackend, 'oconfig, OB>(
+	pub fn merge_succeed<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 		self.deleted.append(&mut substate.deleted);
@@ -120,9 +126,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that reverted.
-	pub fn merge_revert<'obackend, 'oconfig, OB>(
+	pub fn merge_revert<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -131,9 +137,9 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Merge a substate executor that failed.
-	pub fn merge_fail<'obackend, 'oconfig, OB>(
+	pub fn merge_fail<OB>(
 		&mut self,
-		mut substate: StackExecutor<'obackend, 'oconfig, OB>
+		mut substate: StackExecutor<OB>
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
@@ -230,20 +236,19 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get used gas for the current executor, given the price.
-	pub fn used_gas(
-		&self,
-	) -> usize {
+	#[must_use]
+	pub fn used_gas() -> usize {
 		//self.gasometer.total_used_gas() -
 		//	min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as usize)
                 0
 	}
 
 	/// Get fee needed for the current executor, given the price.
+	#[must_use]
 	pub fn fee(
-		&self,
 		price: U256,
 	) -> U256 {
-		let used_gas = self.used_gas();
+		let used_gas = Self::used_gas();
 		U256::from(used_gas) * price
 	}
 
@@ -289,16 +294,16 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get account nonce.
+	#[must_use]
 	pub fn nonce(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.nonce)
-			.unwrap_or(self.backend.basic(address).nonce)
+		self.state.get(&address).map_or(self.backend.basic(address).nonce, |v| v.basic.nonce)
 	}
 
 	/// Withdraw balance from address.
 	pub fn withdraw(&mut self, address: H160, balance: U256) -> Result<(), ExitError> {
 		let source = self.account_mut(address);
 		if source.basic.balance < balance {
-			return Err(ExitError::OutOfFund.into())
+			return Err(ExitError::OutOfFund)
 		}
 		source.basic.balance -= balance;
 
@@ -312,7 +317,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Transfer balance with the given struct.
-	pub fn transfer(&mut self, transfer: Transfer) -> Result<(), ExitError> {
+	pub fn transfer(&mut self, transfer: &Transfer) -> Result<(), ExitError> {
 		self.withdraw(transfer.source, transfer.value)?;
 		self.deposit(transfer.target, transfer.value);
 
@@ -320,6 +325,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 	}
 
 	/// Get the create address from given scheme.
+	#[must_use]
 	pub fn create_address(&self, scheme: CreateScheme) -> H160 {
 		match scheme {
 			CreateScheme::Create2 { caller, code_hash, salt } => {
@@ -339,6 +345,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	
+	#[allow(clippy::too_many_lines)]
 	fn create_inner(
 		&mut self,
 		caller: H160,
@@ -357,7 +365,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			}
 		}
 
-		fn l64(gas: usize) -> usize {
+		const fn l64(gas: usize) -> usize {
 			gas - gas / 64
 		}
 
@@ -387,7 +395,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let mut substate = self.substate(gas_limit, false);
 		{
 			if let Some(code) = substate.account_mut(address).code.as_ref() {
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
@@ -395,7 +403,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				let code = substate.backend.code(address);
 				substate.account_mut(address).code = Some(code.clone());
 
-				if code.len() != 0 {
+				if !code.is_empty() {
 					let _ = self.merge_fail(substate);
 					return Capture::Exit((ExitError::CreateCollision.into(), None, Vec::new()))
 				}
@@ -420,7 +428,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 			target: address,
 			value,
 		};
-		match substate.transfer(transfer) {
+		match substate.transfer(&transfer) {
 			Ok(()) => (),
 			Err(e) => {
 				let _ = self.merge_revert(substate);
@@ -457,7 +465,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				//match substate.gasometer.record_deposit(out.len()) {
 				//	Ok(()) => {
 						let e = self.merge_succeed(substate);
-						self.state.entry(address).or_insert(Default::default())
+						self.state.entry(address).or_insert_with(Default::default)
 							.code = Some(out);
 						try_or_fail!(e);
 						Capture::Exit((ExitReason::Succeed(s), Some(address), Vec::new()))
@@ -484,6 +492,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	fn call_inner(
 		&mut self,
 		code_address: H160,
@@ -504,7 +513,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 //			}
 //		}
 
-		fn l64(gas: usize) -> usize {
+		const fn l64(gas: usize) -> usize {
 			gas - gas / 64
 		}
 
@@ -539,7 +548,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		let transfer_clone = transfer.clone();
 
 		if let Some(transfer) = transfer {
-			match substate.transfer(transfer) {
+			match substate.transfer(&transfer) {
 				Ok(()) => (),
 				Err(e) => {
 					let _ = self.merge_revert(substate);
@@ -563,8 +572,8 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 		}
 
 		let hook_res = self.backend.call_inner(code_address, transfer_clone, input.clone(), Some(target_gas), is_static, take_l64, take_stipend);
-		if hook_res.is_some() {
-			match hook_res.as_ref().unwrap() {
+		if let Some(hook_res) = hook_res {
+			match &hook_res {
 				Capture::Exit((reason, _return_data)) => {
 					match reason {
 						ExitReason::Succeed(_) => {
@@ -583,7 +592,7 @@ impl<'backend, 'config, B: Backend> StackExecutor<'backend, 'config, B> {
 				Capture::Trap(_interrupt) => {
 				},
 			}
-			return hook_res.unwrap();
+			return hook_res;
 		}
 
 		let mut runtime = Runtime::new(
@@ -628,14 +637,13 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	}
 
 	fn balance(&self, address: H160) -> U256 {
-		self.state.get(&address).map(|v| v.basic.balance)
-			.unwrap_or(self.backend.basic(address).balance)
+		self.state.get(&address).map_or(self.backend.basic(address).balance, |v| v.basic.balance)
 	}
 
 	fn code_size(&self, address: H160) -> U256 {
 		U256::from(
-			self.state.get(&address).and_then(|v| v.code.as_ref().map(|c| c.len()))
-				.unwrap_or(self.backend.code_size(address))
+			self.state.get(&address).and_then(|v| v.code.as_ref().map(Vec::len))
+				.unwrap_or_else(|| self.backend.code_size(address))
 		)
 	}
 
@@ -644,13 +652,15 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 			return H256::default()
 		}
 
-		let (balance, nonce, code_size) = if let Some(account) = self.state.get(&address) {
-			(account.basic.balance, account.basic.nonce,
-			 account.code.as_ref().map(|c| U256::from(c.len())).unwrap_or(self.code_size(address)))
-		} else {
+		let (balance, nonce, code_size) = self.state.get(&address).map_or_else(|| {
 			let basic = self.backend.basic(address);
 			(basic.balance, basic.nonce, U256::from(self.backend.code_size(address)))
-		};
+		}, |account| 
+			(
+				account.basic.balance, account.basic.nonce,
+				account.code.as_ref().map_or(self.code_size(address), |c| U256::from(c.len()))
+			)
+		);
 
 		if balance == U256::zero() && nonce == U256::zero() && code_size == U256::zero() {
 			return H256::default()
@@ -659,16 +669,16 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		let value = self.state.get(&address).and_then(|v| {
 			v.code.as_ref().map(|c| {
 				//H256::from_slice(Keccak256::digest(&c).as_slice())
-				self.backend.keccak256_h256(&c)
+				self.backend.keccak256_h256(c)
 			})
-		}).unwrap_or(self.backend.code_hash(address));
+		}).unwrap_or_else(|| self.backend.code_hash(address));
 		value
 	}
 
 	fn code(&self, address: H160) -> Vec<u8> {
 		self.state.get(&address).and_then(|v| {
 			v.code.clone()
-		}).unwrap_or(self.backend.code(address))
+		}).unwrap_or_else(|| self.backend.code(address))
 	}
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
@@ -677,13 +687,13 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 				let s = v.storage.get(&index).cloned();
 
 				if v.reset_storage {
-					Some(s.unwrap_or(U256::zero()))
+					Some(s.unwrap_or_else(U256::zero))
 				} else {
 					s
 				}
 
 			})
-			.unwrap_or(self.backend.storage(address, index))
+			.unwrap_or_else(|| self.backend.storage(address, index))
 	}
 
 	fn original_storage(&self, address: H160, index: U256) -> U256 {
@@ -699,16 +709,16 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		if self.config.empty_considered_exists {
 			self.state.get(&address).is_some() || self.backend.exists(address)
 		} else {
-			if let Some(account) = self.state.get(&address) {
-				account.basic.nonce != U256::zero() ||
-					account.basic.balance != U256::zero() ||
-					account.code.as_ref().map(|c| c.len() != 0).unwrap_or(false) ||
-					self.backend.code(address).len() != 0
-			} else {
-				self.backend.basic(address).nonce != U256::zero() ||
+			self.state.get(&address).map_or_else(|| 
+					self.backend.basic(address).nonce != U256::zero() ||
 					self.backend.basic(address).balance != U256::zero() ||
-					self.backend.code(address).len() != 0
-			}
+					!self.backend.code(address).is_empty(), 
+				|account| 
+					account.basic.nonce != U256::zero() ||
+					account.basic.balance != U256::zero() ||
+					account.code.as_ref().map_or(false, |c| !c.is_empty()) ||
+					!self.backend.code(address).is_empty()
+			)
 		}
 	}
 
@@ -743,9 +753,9 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 	fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
 		let balance = self.balance(address);
 
-		self.transfer(Transfer {
+		self.transfer(&Transfer {
 			source: address,
-			target: target,
+			target,
 			value: balance
 		})?;
 		self.account_mut(address).basic.balance = U256::zero();

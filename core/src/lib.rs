@@ -2,6 +2,12 @@
 
 #![deny(warnings)]
 #![forbid(unused_variables, unused_imports)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(
+	clippy::module_name_repetitions,
+	clippy::missing_errors_doc,
+	clippy::missing_panics_doc
+)]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -52,15 +58,18 @@ pub struct Machine {
 
 impl Machine {
 	/// Reference of machine stack.
-	pub fn stack(&self) -> &Stack { &self.stack }
+	#[must_use]
+	pub const fn stack(&self) -> &Stack { &self.stack }
 	/// Mutable reference of machine stack.
 	pub fn stack_mut(&mut self) -> &mut Stack { &mut self.stack }
 	/// Reference of machine memory.
-	pub fn memory(&self) -> &Memory { &self.memory }
+	#[must_use]
+	pub const fn memory(&self) -> &Memory { &self.memory }
 	/// Mutable reference of machine memory.
 	pub fn memory_mut(&mut self) -> &mut Memory { &mut self.memory }
 
 	/// Create a new machine with given code and data.
+	#[must_use]
 	pub fn new(
 		code: Vec<u8>,
 		data: Vec<u8>,
@@ -80,12 +89,13 @@ impl Machine {
 		}
 	}
 
-	/// Explict exit of the machine. Further step will return error.
+	/// Explicit exit of the machine. Further step will return error.
 	pub fn exit(&mut self, reason: ExitReason) {
 		self.position = Err(reason);
 	}
 
 	/// Inspect the machine's next opcode and current stack.
+	#[must_use]
 	pub fn inspect(&self) -> Option<(Opcode, &Stack)> {
 		let position = match self.position {
 			Ok(position) => position,
@@ -95,6 +105,7 @@ impl Machine {
 	}
 
 	/// Copy and get the return value of the machine, if any.
+	#[must_use]
 	pub fn return_value(&self) -> Vec<u8> {
 		self.memory.get(
 			self.return_range.start,
@@ -116,30 +127,29 @@ impl Machine {
 	pub fn step(&mut self) -> Result<(), Capture<ExitReason, Trap>> {
 		let position = *self.position.as_ref().map_err(|reason| Capture::Exit(reason.clone()))?;
 
-		match self.code.get(position).map(|v| Opcode(*v)) {
-			Some(opcode) => {
-				match eval(self, opcode, position) {
-					Control::Continue(p) => {
-						self.position = Ok(position + p);
-						Ok(())
-					},
-					Control::Exit(e) => {
-						self.position = Err(e.clone());
-						Err(Capture::Exit(e))
-					},
-					Control::Jump(p) => {
-						self.position = Ok(p);
-						Ok(())
-					},
-					Control::Trap(opcode) => {
-						self.position = Ok(position + 1);
-						Err(Capture::Trap(opcode))
-					},
-				}
+		let opcode = if let Some(opcode) = self.code.get(position).map(|v| Opcode(*v)) {
+			opcode
+		} else {
+			self.position = Err(ExitSucceed::Stopped.into());
+			return Err(Capture::Exit(ExitSucceed::Stopped.into()))
+		};
+
+		match eval(self, opcode, position) {
+			Control::Continue(p) => {
+				self.position = Ok(position + p);
+				Ok(())
 			},
-			None => {
-				self.position = Err(ExitSucceed::Stopped.into());
-				Err(Capture::Exit(ExitSucceed::Stopped.into()))
+			Control::Exit(e) => {
+				self.position = Err(e.clone());
+				Err(Capture::Exit(e))
+			},
+			Control::Jump(p) => {
+				self.position = Ok(p);
+				Ok(())
+			},
+			Control::Trap(opcode) => {
+				self.position = Ok(position + 1);
+				Err(Capture::Trap(opcode))
 			},
 		}
 	}

@@ -1,3 +1,5 @@
+#![allow(clippy::use_self)]
+
 use fixed_hash::{construct_fixed_hash, impl_fixed_hash_conversions};
 use uint::{construct_uint};
 
@@ -161,7 +163,7 @@ impl<'de> serde::Deserialize<'de> for U256 {
 
 			fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Self::Value, E>
 			{
-				let mut data = [0u8; 32];
+				let mut data = [0_u8; 32];
 				data.copy_from_slice(v);
 
 				let value: U256 = unsafe { core::mem::transmute(data) };
@@ -183,10 +185,11 @@ impl U256 {
 		buffer.reverse();
 	}
 
+	#[must_use]
 	pub fn from_big_endian_fast(buffer: &[u8]) -> U256 {
 		assert!(32 >= buffer.len());
 
-		let mut data = [0u8; 32];
+		let mut data = [0_u8; 32];
 
 		data[32 - buffer.len()..32].copy_from_slice(buffer);
 		data.reverse();

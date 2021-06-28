@@ -31,11 +31,11 @@ pub type Bytes = alloc::vec::Vec<u8>;
 #[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
 #[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Log {
-        /// address
+	/// address
 	pub address: H160,
-        /// topics
+	/// topics
 	pub topics: Vec<H256>,
-        /// data
+	/// data
 	#[serde(with = "serde_bytes")]
 	pub data: Bytes,
 }
@@ -103,6 +103,7 @@ pub trait Backend {
 	fn create(&self, scheme: &CreateScheme, address: &H160);
 
 	/// Hook on Solidity's call
+	#[allow(clippy::too_many_arguments)]
 	fn call_inner(&self,
 		code_address: H160,
 		transfer: Option<Transfer>,

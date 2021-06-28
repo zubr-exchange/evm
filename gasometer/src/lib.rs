@@ -2,6 +2,12 @@
 
 #![deny(warnings)]
 #![forbid(unsafe_code, unused_variables, unused_imports)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(
+	clippy::module_name_repetitions,
+	clippy::missing_errors_doc,
+	clippy::missing_panics_doc
+)]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -89,13 +95,13 @@ impl<'config> Gasometer<'config> {
 		}
 	}
 
-	/// Explictly fail the gasometer with out of gas. Return `OutOfGas` error.
+	/// Explicitly fail the gasometer with out of gas. Return `OutOfGas` error.
 	pub fn fail(&mut self) -> ExitError {
 		self.inner = Err(ExitError::OutOfGas);
 		ExitError::OutOfGas
 	}
 
-	/// Record an explict cost.
+	/// Record an explicit cost.
 	pub fn record_cost(
 		&mut self,
 		cost: usize
@@ -110,7 +116,7 @@ impl<'config> Gasometer<'config> {
 		Ok(())
 	}
 
-	/// Record an explict refund.
+	/// Record an explicit refund.
 	pub fn record_refund(
 		&mut self,
 		refund: isize,

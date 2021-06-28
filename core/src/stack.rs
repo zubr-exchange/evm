@@ -7,7 +7,7 @@ mod serde_vec_u256 {
 	use alloc::{fmt, vec::Vec};
 	use crate::U256;
 
-	pub fn serialize<S: Serializer>(data: &Vec<U256>, serializer: S) -> Result<S::Ok, S::Error>
+	pub fn serialize<S: Serializer>(data: &[U256], serializer: S) -> Result<S::Ok, S::Error>
 	{
 		let (prefix, bytes, sufix) = unsafe { data.align_to::<u8>() };
 		assert_eq!(prefix.len(), 0);
@@ -60,7 +60,8 @@ pub struct Stack {
 
 impl Stack {
 	/// Create a new stack with given limit.
-	pub fn new(limit: usize) -> Self {
+	#[must_use]
+	pub const fn new(limit: usize) -> Self {
 		Self {
 			data: Vec::new(),
 			limit,
@@ -68,11 +69,14 @@ impl Stack {
 	}
 
 	/// Stack limit.
-	pub fn limit(&self) -> usize {
+	#[must_use]
+	pub const fn limit(&self) -> usize {
 		self.limit
 	}
 
 	/// Stack length.
+	#[must_use]
+	#[allow(clippy::len_without_is_empty)]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
