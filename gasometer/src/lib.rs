@@ -96,6 +96,19 @@ impl<'config> Gasometer<'config> {
 		}
 	}
 
+	/// Used gas.
+	pub fn used_gas(&self) -> u64 {
+		match self.inner.as_ref() {
+			Ok(inner) => {
+				let mg = memory::memory_gas(inner.memory_cost).expect("Checked via record");
+				let tug = inner.used_gas + mg;
+				let rg = inner.refunded_gas;
+				tug - core::cmp::min(tug / 2, rg as u64)
+			},
+			Err(_) => 0,
+		}
+	}
+
 	/// Explicitly fail the gasometer with out of gas. Return `OutOfGas` error.
 	pub fn fail(&mut self) -> ExitError {
 		self.inner = Err(ExitError::OutOfGas);
