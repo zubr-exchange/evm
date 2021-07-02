@@ -125,7 +125,7 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 
 	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
-			.map_or(U256::zero(), |v| 
+			.map_or(U256::zero(), |v|
 				v.storage.get(&index).cloned().unwrap_or_else(U256::zero))
 	}
 
@@ -135,7 +135,7 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		_code_address: H160,
 		_transfer: Option<Transfer>,
 		_input: Vec<u8>,
-		_target_gas: Option<usize>,
+		_target_gas: Option<u64>,
 		_is_static: bool,
 		_take_l64: bool,
 		_take_stipend: bool,

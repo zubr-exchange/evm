@@ -110,7 +110,7 @@ pub trait Backend {
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		take_l64: bool,
 		take_stipend: bool,

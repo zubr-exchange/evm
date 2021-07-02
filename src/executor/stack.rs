@@ -1,13 +1,15 @@
 #![allow(clippy::let_underscore_drop)]
 
-use core::convert::Infallible;
-use core::cmp::min;
-use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
-use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer, Valids,
-			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config, U256, H256, H160};
-use crate::backend::{Log, Basic, Apply, Backend};
-//use crate::gasometer::{self, Gasometer};
+use alloc::vec::Vec;
+use core::convert::Infallible;
+
+use crate::{
+	Capture, Config, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, H160,
+	H256, Handler, Opcode, Runtime, Stack, Transfer, Valids, U256,
+};
+use crate::backend::{Apply, Backend, Basic, Log};
+use crate::gasometer::{self, Gasometer};
 
 
 /// Account definition for the stack-based executor.
@@ -26,18 +28,20 @@ pub struct StackAccount {
 	pub reset_storage: bool,
 }
 
-type PrecompileResult = Option<Result<(ExitSucceed, Vec<u8>, usize), ExitError>>;
+type PrecompileOutput = (ExitSucceed, Vec<u8>, u64);
+type PrecompileResult = Option<Result<PrecompileOutput, ExitError>>;
+type PrecompileFn = fn(H160, &[u8], Option<u64>) -> PrecompileResult;
 
 /// Stack-based executor.
 #[derive(Clone)]
 pub struct StackExecutor<'backend, 'config, B> {
 	backend: &'backend B,
 	config: &'config Config,
-	//gasometer: Gasometer<'config>,
+	gasometer: Gasometer<'config>,
 	state: BTreeMap<H160, StackAccount>,
 	deleted: BTreeSet<H160>,
 	logs: Vec<Log>,
-	precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
+	precompile: PrecompileFn,
 	is_static: bool,
 	depth: Option<usize>,
 }
@@ -45,7 +49,7 @@ pub struct StackExecutor<'backend, 'config, B> {
 const fn no_precompile(
 	_address: H160,
 	_input: &[u8],
-	_target_gas: Option<usize>
+	_target_gas: Option<u64>
 ) -> PrecompileResult {
 	None
 }
@@ -54,7 +58,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 	/// Create a new stack-based executor.
 	pub fn new(
 		backend: &'backend B,
-		gas_limit: usize,
+		gas_limit: u64,
 		config: &'config Config,
 	) -> Self {
 		Self::new_with_precompile(backend, gas_limit, config, no_precompile)
@@ -63,13 +67,13 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 	/// Create a new stack-based executor with given precompiles.
 	pub fn new_with_precompile(
 		backend: &'backend B,
-		_gas_limit: usize,
+		gas_limit: u64,
 		config: &'config Config,
-		precompile: fn(H160, &[u8], Option<usize>) -> PrecompileResult,
+		precompile: PrecompileFn,
 	) -> Self {
 		Self {
 			backend,
-			//gasometer: Gasometer::new(gas_limit, config),
+			gasometer: Gasometer::new(gas_limit, config),
 			state: BTreeMap::new(),
 			deleted: BTreeSet::new(),
 			config,
@@ -82,10 +86,10 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 	/// Create a substate executor from the current executor.
 	#[must_use]
-	pub fn substate(&self, _gas_limit: usize, is_static: bool) -> StackExecutor<'backend, 'config, B> {
+	pub fn substate(&self, gas_limit: u64, is_static: bool) -> StackExecutor<'backend, 'config, B> {
 		Self {
 			backend: self.backend,
-			//gasometer: Gasometer::new(gas_limit, self.gasometer.config()),
+			gasometer: Gasometer::new(gas_limit, self.gasometer.config()),
 			config: self.config,
 			state: self.state.clone(),
 			deleted: self.deleted.clone(),
@@ -109,9 +113,8 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 	/// Get remaining gas.
 	#[must_use]
-	pub fn gas() -> usize {
-		//self.gasometer.gas()
-                12_341_234
+	pub fn gas(&self) -> u64 {
+		self.gasometer.gas() // 12341234
 	}
 
 	/// Merge a substate executor that succeeded.
@@ -123,8 +126,8 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		self.deleted.append(&mut substate.deleted);
 		self.state = substate.state;
 
-		//self.gasometer.record_stipend(substate.gasometer.gas())?;
-		//self.gasometer.record_refund(substate.gasometer.refunded_gas())?;
+		self.gasometer.record_stipend(substate.gasometer.gas())?;
+		self.gasometer.record_refund(substate.gasometer.refunded_gas())?;
 		Ok(())
 	}
 
@@ -135,7 +138,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 	) -> Result<(), ExitError> {
 		self.logs.append(&mut substate.logs);
 
-		//self.gasometer.record_stipend(substate.gasometer.gas())?;
+		self.gasometer.record_stipend(substate.gasometer.gas())?;
 		Ok(())
 	}
 
@@ -155,13 +158,13 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		caller: H160,
 		value: U256,
 		init_code: Vec<u8>,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> ExitReason {
-//		let transaction_cost = gasometer::create_transaction_cost(&init_code);
-//		match self.gasometer.record_transaction(transaction_cost) {
-//			Ok(()) => (),
-//			Err(e) => return e.into(),
-//		}
+		let transaction_cost = gasometer::create_transaction_cost(&init_code);
+		match self.gasometer.record_transaction(transaction_cost) {
+			Ok(()) => (),
+			Err(e) => return e.into(),
+		}
 
 		match self.create_inner(
 			caller,
@@ -183,13 +186,13 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		value: U256,
 		init_code: Vec<u8>,
 		salt: H256,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> ExitReason {
-//		let transaction_cost = gasometer::create_transaction_cost(&init_code);
-//		match self.gasometer.record_transaction(transaction_cost) {
-//			Ok(()) => (),
-//			Err(e) => return e.into(),
-//		}
+		let transaction_cost = gasometer::create_transaction_cost(&init_code);
+		match self.gasometer.record_transaction(transaction_cost) {
+			Ok(()) => (),
+			Err(e) => return e.into(),
+		}
 		let code_hash = self.backend.keccak256_h256(&init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
 
 		match self.create_inner(
@@ -212,13 +215,13 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		address: H160,
 		value: U256,
 		data: Vec<u8>,
-		gas_limit: usize,
+		gas_limit: u64,
 	) -> (ExitReason, Vec<u8>) {
-//		let transaction_cost = gasometer::call_transaction_cost(&data);
-//		match self.gasometer.record_transaction(transaction_cost) {
-//			Ok(()) => (),
-//			Err(e) => return (e.into(), Vec::new()),
-//		}
+		let transaction_cost = gasometer::call_transaction_cost(&data);
+		match self.gasometer.record_transaction(transaction_cost) {
+			Ok(()) => (),
+			Err(e) => return (e.into(), Vec::new()),
+		}
 
 		self.account_mut(caller).basic.nonce += U256::one();
 
@@ -238,20 +241,21 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		}
 	}
 
-	/// Get used gas for the current executor, given the price.
+	/// Get used gas for the current executor.
 	#[must_use]
-	pub fn used_gas() -> usize {
-		//self.gasometer.total_used_gas() -
-		//	min(self.gasometer.total_used_gas() / 2, self.gasometer.refunded_gas() as usize)
-                0
+	#[allow(clippy::cast_sign_loss)]
+	pub fn used_gas(&self) -> u64 {
+		let rg = self.gasometer.refunded_gas();
+		assert!(rg >= 0);
+		let tug = self.gasometer.total_used_gas();
+		tug - core::cmp::min(tug / 2, rg as u64)
+        // 0
 	}
 
 	/// Get fee needed for the current executor, given the price.
 	#[must_use]
-	pub fn fee(
-		price: U256,
-	) -> U256 {
-		let used_gas = Self::used_gas();
+	pub fn fee(&self, price: U256) -> U256 {
+		let used_gas = self.used_gas();
 		U256::from(used_gas) * price
 	}
 
@@ -357,7 +361,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		scheme: CreateScheme,
 		value: U256,
 		init_code: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		take_l64: bool,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Infallible> {
 		macro_rules! try_or_fail {
@@ -369,7 +373,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 			}
 		}
 
-		const fn l64(gas: usize) -> usize {
+		const fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
@@ -383,14 +387,14 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 			return Capture::Exit((ExitError::OutOfFund.into(), None, Vec::new()))
 		}
 
-		let mut after_gas = 0;//self.gasometer.gas();
+		let mut after_gas = self.gasometer.gas(); // 0;
 		if take_l64 && self.config.call_l64_after_gas {
 			after_gas = l64(after_gas);
 		}
 		let target_gas = target_gas.unwrap_or(after_gas);
 
-		let gas_limit = min(after_gas, target_gas);
-		//try_or_fail!(self.gasometer.record_cost(gas_limit));
+		let gas_limit = core::cmp::min(after_gas, target_gas);
+		try_or_fail!(self.gasometer.record_cost(gas_limit));
 
 		let address = self.create_address(scheme);
                 self.backend.create(&scheme, &address);
@@ -462,29 +466,29 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 				if let Some(limit) = self.config.create_contract_limit {
 					if out.len() > limit {
-						//substate.gasometer.fail();
+						substate.gasometer.fail();
 						let _ = self.merge_fail(substate);
 						return Capture::Exit((ExitError::CreateContractLimit.into(), None, Vec::new()))
 					}
 				}
 
-				//match substate.gasometer.record_deposit(out.len()) {
-				//	Ok(()) => {
+				match substate.gasometer.record_deposit(out.len()) {
+					Ok(()) => {
 						let e = self.merge_succeed(substate);
 						let entry: &mut _ = self.state.entry(address).or_insert_with(Default::default);
 						entry.valids = Some(Valids::compute(&out));
 						entry.code = Some(out);
 						try_or_fail!(e);
 						Capture::Exit((ExitReason::Succeed(s), Some(address), Vec::new()))
-				//	},
-				//	Err(e) => {
-				//		let _ = self.merge_fail(substate);
-				//		Capture::Exit((ExitReason::Error(e), None, Vec::new()))
-				//	},
-				//}
+					},
+					Err(e) => {
+						let _ = self.merge_fail(substate);
+						Capture::Exit((ExitReason::Error(e), None, Vec::new()))
+					},
+				}
 			},
 			ExitReason::Error(e) => {
-				//substate.gasometer.fail();
+				substate.gasometer.fail();
 				let _ = self.merge_fail(substate);
 				Capture::Exit((ExitReason::Error(e), None, Vec::new()))
 			},
@@ -493,7 +497,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 				Capture::Exit((ExitReason::Revert(e), None, runtime.machine().return_value()))
 			},
 			ExitReason::Fatal(e) => {
-				//self.gasometer.fail();
+				self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), None, Vec::new()))
 			},
 			ExitReason::StepLimitReached => { unreachable!() }
@@ -501,39 +505,40 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 	}
 
 	#[allow(clippy::too_many_arguments)]
+	#[allow(clippy::too_many_lines)]
 	fn call_inner(
 		&mut self,
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		take_l64: bool,
 		take_stipend: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Infallible> {
-//		macro_rules! try_or_fail {
-//			( $e:expr ) => {
-//				match $e {
-//					Ok(v) => v,
-//					Err(e) => return Capture::Exit((e.into(), Vec::new())),
-//				}
-//			}
-//		}
+		macro_rules! try_or_fail {
+			( $e:expr ) => {
+				match $e {
+					Ok(v) => v,
+					Err(e) => return Capture::Exit((e.into(), Vec::new())),
+				}
+			}
+		}
 
-		const fn l64(gas: usize) -> usize {
+		const fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
 
-		let mut after_gas = 0;//self.gasometer.gas();
+		let mut after_gas = self.gasometer.gas(); // 0;
 		if take_l64 && self.config.call_l64_after_gas {
 			after_gas = l64(after_gas);
 		}
 
 		let target_gas = target_gas.unwrap_or(after_gas);
-		let mut gas_limit = min(target_gas, after_gas);
+		let mut gas_limit = core::cmp::min(target_gas, after_gas);
 
-		//try_or_fail!(self.gasometer.record_cost(gas_limit));
+		try_or_fail!(self.gasometer.record_cost(gas_limit));
 
 		if let Some(transfer) = transfer.as_ref() {
 			if take_stipend && transfer.value != U256::zero() {
@@ -568,8 +573,8 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 		if let Some(ret) = (substate.precompile)(code_address, &input, Some(gas_limit)) {
 			return match ret {
-				Ok((s, out, _cost)) => {
-					//let _ = substate.gasometer.record_cost(cost);
+				Ok((s, out, cost)) => {
+					let _ = substate.gasometer.record_cost(cost);
 					let _ = self.merge_succeed(substate);
 					Capture::Exit((ExitReason::Succeed(s), out))
 				},
@@ -630,7 +635,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 				Capture::Exit((ExitReason::Revert(e), runtime.machine().return_value()))
 			},
 			ExitReason::Fatal(e) => {
-				//self.gasometer.fail();
+				self.gasometer.fail();
 				Capture::Exit((ExitReason::Fatal(e), Vec::new()))
 			},
 			ExitReason::StepLimitReached => { unreachable!() }
@@ -723,11 +728,18 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		self.backend.storage(address, index)
 	}
 
+	#[allow(clippy::option_if_let_else)]
+	#[allow(clippy::map_unwrap_or)]
 	fn exists(&self, address: H160) -> bool {
 		if self.config.empty_considered_exists {
 			self.state.get(&address).is_some() || self.backend.exists(address)
+		} else if let Some(account) = self.state.get(&address) {
+			account.basic.nonce != U256::zero() ||
+				account.basic.balance != U256::zero() ||
+				account.code.as_ref().map(|c| !c.is_empty()).unwrap_or(false) ||
+				!self.backend.code(address).is_empty()
 		} else {
-			self.state.get(&address).map_or_else(|| 
+			self.state.get(&address).map_or_else(||
 					self.backend.basic(address).nonce != U256::zero() ||
 					self.backend.basic(address).balance != U256::zero() ||
 					!self.backend.code(address).is_empty(), 
@@ -740,7 +752,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		}
 	}
 
-	fn gas_left(&self) -> U256 { U256::one() } //U256::from(self.gasometer.gas()) }
+	fn gas_left(&self) -> U256 { U256::from(self.gasometer.gas()) } // { U256::one() }
 
 	fn gas_price(&self) -> U256 { self.backend.gas_price() }
 	fn origin(&self) -> H160 { self.backend.origin() }
@@ -789,7 +801,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		scheme: CreateScheme,
 		value: U256,
 		init_code: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Self::CreateInterrupt> {
 		self.create_inner(caller, scheme, value, init_code, target_gas, true)
 	}
@@ -799,7 +811,7 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		context: Context,
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
@@ -808,22 +820,24 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 
 	fn pre_validate(
 		&mut self,
-		_context: &Context,
-		_opcode: Opcode,
-		_stack: &Stack
+		context: &Context,
+		opcode: Opcode,
+		stack: &Stack,
 	) -> Result<(), ExitError> {
-		// if let Some(cost) = gasometer::static_opcode_cost(opcode) {
-		// 	self.state.metadata_mut().gasometer.record_cost(cost)?;
-		// } else {
-		// 	let is_static = self.state.metadata().is_static;
-		// 	let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(
-		// 		context.address, opcode, stack, is_static, &self.config, self
-		// 	)?;
-
-		// 	let gasometer = &mut self.state.metadata_mut().gasometer;
-
-		// 	gasometer.record_dynamic_cost(gas_cost, memory_cost)?;
-		// }
+		if let Some(cost) = gasometer::static_opcode_cost(opcode) {
+			self.gasometer.record_cost(cost)?;
+		} else {
+			let is_static = self.is_static;
+			let (gas_cost, memory_cost) = gasometer::dynamic_opcode_cost(
+				context.address,
+				opcode,
+				stack,
+				is_static,
+				self.config,
+				self,
+			)?;
+			self.gasometer.record_dynamic_cost(gas_cost, memory_cost)?;
+		}
 
 		Ok(())
 	}

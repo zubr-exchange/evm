@@ -197,3 +197,17 @@ impl U256 {
 		unsafe { core::mem::transmute(data) }
 	}
 }
+
+impl From<U256> for H256 {
+	fn from(value: U256) -> H256 {
+		let mut h = H256::default();
+		value.into_big_endian_fast(&mut h[..]);
+		h
+	}
+}
+
+impl From<U256> for H160 {
+	fn from(value: U256) -> H160 {
+		H256::from(value).into()
+	}
+}
