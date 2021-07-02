@@ -4,10 +4,11 @@ use core::convert::Infallible;
 use core::cmp::min;
 use alloc::vec::Vec;
 use alloc::collections::{BTreeMap, BTreeSet};
-use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer,
+use crate::{ExitError, Stack, Opcode, Capture, Handler, Transfer, Valids,
 			Context, CreateScheme, Runtime, ExitReason, ExitSucceed, Config, U256, H256, H160};
 use crate::backend::{Log, Basic, Apply, Backend};
 //use crate::gasometer::{self, Gasometer};
+
 
 /// Account definition for the stack-based executor.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
@@ -16,6 +17,8 @@ pub struct StackAccount {
 	pub basic: Basic,
 	/// Code. `None` means the code is currently unknown.
 	pub code: Option<Vec<u8>>,
+	/// Valids. `None` means the code is currently unknown.
+	pub valids: Option<Vec<u8>>,
 	/// Storage. Not inserted values mean it is currently known, but not empty.
 	pub storage: BTreeMap<U256, U256>,
 	/// Whether the storage in the database should be reset before storage
@@ -268,7 +271,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 			applies.push(Apply::Modify {
 				address,
 				basic: account.basic,
-				code: account.code,
+				code_and_valids: account.code.zip(account.valids),
 				storage: account.storage,
 				reset_storage: account.reset_storage,
 			});
@@ -288,6 +291,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		self.state.entry(address).or_insert(StackAccount {
 			basic: self.backend.basic(address),
 			code: None,
+			valids: None,
 			storage: BTreeMap::new(),
 			reset_storage: false,
 		})
@@ -440,8 +444,10 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 			substate.account_mut(address).basic.nonce += U256::one();
 		}
 
+		let valids = Valids::compute(&init_code);
 		let mut runtime = Runtime::new(
 			init_code,
+			valids,
 			Vec::new(),
 			context,
 			self.config,
@@ -465,8 +471,9 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 				//match substate.gasometer.record_deposit(out.len()) {
 				//	Ok(()) => {
 						let e = self.merge_succeed(substate);
-						self.state.entry(address).or_insert_with(Default::default)
-							.code = Some(out);
+						let entry: &mut _ = self.state.entry(address).or_insert_with(Default::default);
+						entry.valids = Some(Valids::compute(&out));
+						entry.code = Some(out);
 						try_or_fail!(e);
 						Capture::Exit((ExitReason::Succeed(s), Some(address), Vec::new()))
 				//	},
@@ -535,6 +542,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 		}
 
 		let code = self.code(code_address);
+		let valids = self.valids(code_address);
 
 		let mut substate = self.substate(gas_limit, is_static);
 		substate.account_mut(context.address);
@@ -599,6 +607,7 @@ impl<'backend, 'config, B: 'backend + Backend> StackExecutor<'backend, 'config, 
 
 		let mut runtime = Runtime::new(
 			code,
+			valids,
 			input,
 			context,
 			self.config,
@@ -682,6 +691,12 @@ impl<'backend, 'config, B: Backend> Handler for StackExecutor<'backend, 'config,
 		self.state.get(&address).and_then(|v| {
 			v.code.clone()
 		}).unwrap_or_else(|| self.backend.code(address))
+	}
+
+	fn valids(&self, address: H160) -> Vec<u8> {
+		self.state.get(&address).and_then(|v| {
+			v.valids.clone()
+		}).unwrap_or_else(|| self.backend.valids(address))
 	}
 
 	fn storage(&self, address: H160, index: U256) -> U256 {

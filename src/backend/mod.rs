@@ -36,7 +36,7 @@ pub struct Log {
 	/// topics
 	pub topics: Vec<H256>,
 	/// data
-	#[serde(with = "serde_bytes")]
+	#[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	pub data: Bytes,
 }
 //pub use ethereum::Log;
@@ -51,7 +51,7 @@ pub enum Apply<I> {
 		/// Basic information of the address.
 		basic: Basic,
 		/// Code. `None` means leaving it unchanged.
-		code: Option<Vec<u8>>,
+		code_and_valids: Option<(Vec<u8>, Vec<u8>)>,
 		/// Storage iterator.
 		storage: I,
 		/// Whether storage should be wiped empty before applying the storage
@@ -96,6 +96,8 @@ pub trait Backend {
 	fn code_size(&self, address: H160) -> usize;
 	/// Get account code.
 	fn code(&self, address: H160) -> Vec<u8>;
+	/// Get account code valids.
+	fn valids(&self, address: H160) -> Vec<u8>;
 	/// Get storage value of address at index.
 	fn storage(&self, address: H160, index: U256) -> U256;
 

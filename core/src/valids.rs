@@ -1,4 +1,4 @@
-use alloc::{vec,vec::Vec};
+use alloc::{vec, vec::Vec};
 
 /// Mapping of valid jump destination from code.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -12,55 +12,49 @@ pub struct Valids{
 impl Valids {
 	/// Create a new valid mapping from given code bytes.
 	#[must_use]
-	pub fn new(code: &[u8]) -> Self {
-		let mut valids: Vec<u8> = vec![0; code.len()];
-
-		let mut i = 0;
-		while i < code.len() {
-			let opcode = code[i];
-			match opcode {
-				0x5b => { // Jump Dest
-					valids[i] = 1_u8;
-				},
-				0x60..=0x7f => { // Push
-					i += (opcode as usize) - 0x60 + 1;
-				},
-				_ => {}
-			}
-
-			i += 1;
-		}
-
+	pub fn new(valids: Vec<u8>) -> Self {
 		Self{ data: valids }
-	}
-
-	/// Get the length of the valid mapping. This is the same as the
-	/// code bytes.
-	#[inline]
-	#[must_use]
-	pub fn len(&self) -> usize {
-		self.data.len()
-	}
-
-	/// Returns true if the valids list is empty
-	#[inline]
-	#[must_use]
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
 	}
 
 	/// Returns `true` if the position is a valid jump destination. If
 	/// not, returns `false`.
 	#[must_use]
 	pub fn is_valid(&self, position: usize) -> bool {
-		if position >= self.data.len() {
+		if position >= (self.data.len() * 8) {
 			return false;
 		}
 
-		if self.data[position] == 0 {
-			return false;
-		}
+		let byte_index = position / 8;
+		let byte = self.data[byte_index];
 
-		true
+		let bit_index = position % 8;
+		let bit_test = 1_u8 >> bit_index;
+
+		(byte & bit_test) == bit_test
+	}
+
+	#[must_use]
+	pub fn compute(code: &[u8]) -> Vec<u8> {
+		let valids_bytes_len = (code.len() / 8) + 1;
+		let mut valids: Vec<u8> = vec![0; valids_bytes_len];
+	
+		let mut i = 0;
+		while i < code.len() {
+			let opcode = code[i];
+			match opcode {
+				0x5b => { // Jump Dest
+					let byte: &mut u8 = &mut valids[i / 8];
+					*byte |= 1_u8 >> (i % 8);
+				},
+				0x60..=0x7f => { // Push
+					i += (opcode as usize) - 0x60 + 1;
+				},
+				_ => {}
+			}
+	
+			i += 1;
+		}
+	
+		valids
 	}
 }
