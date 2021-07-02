@@ -35,8 +35,8 @@ pub struct Log {
 	pub address: H160,
 	/// topics
 	pub topics: Vec<H256>,
-	/// data
-	#[serde(with = "serde_bytes")]
+    /// data
+    #[cfg_attr(feature = "with-serde", serde(with = "serde_bytes"))]
 	pub data: Bytes,
 }
 //pub use ethereum::Log;
@@ -108,7 +108,7 @@ pub trait Backend {
 		code_address: H160,
 		transfer: Option<Transfer>,
 		input: Vec<u8>,
-		target_gas: Option<usize>,
+		target_gas: Option<u64>,
 		is_static: bool,
 		take_l64: bool,
 		take_stipend: bool,

@@ -10,8 +10,8 @@ edition = "2018"
 
 [dependencies]
 log = { version = "0.4", default-features = false }
-evm-core = { version = "0.18", path = "core", default-features = false }
-#evm-gasometer = { version = "0.18", path = "gasometer", default-features = false }
+evm-core = { version = "0.18", path = "core", default-features = false, features = ["with-serde"] }
+evm-gasometer = { version = "0.18", path = "gasometer", default-features = false, features = ["with-serde"] }
 evm-runtime = { version = "0.18", path = "runtime", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 rlp = { version = "0.5", default-features = false }
