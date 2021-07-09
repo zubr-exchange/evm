@@ -99,12 +99,13 @@ impl<'config> Runtime<'config> {
 	/// Create a new runtime with given code and data.
 	pub fn new(
 		code: Vec<u8>,
+		valids: Vec<u8>,
 		data: Vec<u8>,
 		context: Context,
 		config: &'config Config,
 	) -> Self {
 		Self {
-			machine: Machine::new(code, data, config.stack_limit, config.memory_limit),
+			machine: Machine::new(code, valids, data, config.stack_limit, config.memory_limit),
 			status: Ok(()),
 			return_data_buffer: Vec::new(),
 			context,

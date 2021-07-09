@@ -72,11 +72,12 @@ impl Machine {
 	#[must_use]
 	pub fn new(
 		code: Vec<u8>,
+		valids: Vec<u8>,
 		data: Vec<u8>,
 		stack_limit: usize,
 		memory_limit: usize
 	) -> Self {
-		let valids = Valids::new(&code[..]);
+		let valids = Valids::new(valids);
 
 		Self {
 			data,

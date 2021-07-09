@@ -4,7 +4,7 @@ use core::convert::Infallible;
 use sha3::{Digest, Keccak256};
 use super::{Basic, Backend, ApplyBackend, Apply, Log};
 use evm_runtime::CreateScheme;
-use crate::{Capture, Transfer, ExitReason, H160, H256, U256};
+use crate::{Capture, Transfer, ExitReason, Valids, H160, H256, U256};
 
 /// Vivinity value of a memory backend.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -119,6 +119,10 @@ impl<'vicinity> Backend for MemoryBackend<'vicinity> {
 		self.state.get(&address).map(|v| v.code.clone()).unwrap_or_default()
 	}
 
+	fn valids(&self, address: H160) -> Vec<u8> {
+		self.state.get(&address).map(|v| Valids::compute(&v.code)).unwrap_or_default()
+	}
+
 	fn storage(&self, address: H160, index: U256) -> U256 {
 		self.state.get(&address)
 			.map_or(U256::zero(), |v|
@@ -166,13 +170,13 @@ impl<'vicinity> ApplyBackend for MemoryBackend<'vicinity> {
 		for apply in values {
 			match apply {
 				Apply::Modify {
-					address, basic, code, storage, reset_storage,
+					address, basic, code_and_valids, storage, reset_storage,
 				} => {
 					let is_empty = {
 						let account = self.state.entry(address).or_insert_with(Default::default);
 						account.balance = basic.balance;
 						account.nonce = basic.nonce;
-						if let Some(code) = code {
+						if let Some((code, _valids)) = code_and_valids {
 							account.code = code;
 						}
 
