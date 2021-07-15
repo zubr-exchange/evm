@@ -4,7 +4,9 @@ use crate::{Capture, Stack, ExitError, Opcode,
 			H160, H256, U256};
 
 /// Transfer from source to target, with given value.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "with-codec", derive(codec::Encode, codec::Decode))]
+#[cfg_attr(feature = "with-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Transfer {
 	/// Source address.
 	pub source: H160,
