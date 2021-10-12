@@ -1,7 +1,7 @@
 //! Ethereum Virtual Machine implementation in Rust
 
 #![deny(warnings)]
-#![forbid(unsafe_code, missing_docs, unused_variables, unused_imports)]
+#![forbid(unsafe_code, unused_variables)]
 #![deny(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(
 	clippy::module_name_repetitions,
@@ -16,6 +16,22 @@ extern crate alloc;
 pub use evm_core::*;
 pub use evm_runtime::*;
 pub use evm_gasometer as gasometer;
+
+#[cfg(feature = "tracing")]
+pub mod tracing;
+
+#[cfg(feature = "tracing")]
+macro_rules! event {
+	($x:expr) => {
+		use crate::tracing::Event::*;
+		crate::tracing::with(|listener| listener.event($x));
+	};
+}
+
+#[cfg(not(feature = "tracing"))]
+macro_rules! event {
+	($x:expr) => {};
+}
 
 pub mod executor;
 pub mod backend;

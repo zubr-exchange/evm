@@ -4,6 +4,8 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 use core::convert::Infallible;
 use evm_runtime::CONFIG;
+#[cfg(feature = "tracing")]
+use sha3::{Digest, Keccak256};
 
 use crate::{
 	Capture, Context, CreateScheme, ExitError, ExitReason, ExitSucceed, H160,
@@ -12,6 +14,25 @@ use crate::{
 use crate::backend::{Apply, Backend, Basic, Log};
 use crate::gasometer::{self, Gasometer};
 
+macro_rules! emit_exit {
+	($reason:expr) => {{
+		let reason = $reason;
+		event!(Exit {
+			reason: &reason,
+			return_value: &Vec::new(),
+		});
+		reason
+	}};
+	($reason:expr, $return_value:expr) => {{
+		let reason = $reason;
+		let return_value = $return_value;
+		event!(Exit {
+			reason: &reason,
+			return_value: &return_value,
+		});
+		(reason, return_value)
+	}};
+}
 
 /// Account definition for the stack-based executor.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
@@ -156,10 +177,18 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 		init_code: Vec<u8>,
 		gas_limit: u64,
 	) -> ExitReason {
+		event!(TransactCreate {
+			caller,
+			value,
+			init_code: &init_code,
+			gas_limit,
+			address: self.create_address(CreateScheme::Legacy { caller }),
+		});
+
 		let transaction_cost = gasometer::create_transaction_cost(&init_code);
 		match self.gasometer.record_transaction(transaction_cost) {
 			Ok(()) => (),
-			Err(e) => return e.into(),
+			Err(e) => return emit_exit!(e.into()),
 		}
 
 		match self.create_inner(
@@ -170,7 +199,7 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 			Some(gas_limit),
 			false,
 		) {
-			Capture::Exit((s, _, _)) => s,
+			Capture::Exit((s, _, _)) => emit_exit!(s),
 			Capture::Trap(_) => unreachable!(),
 		}
 	}
@@ -184,10 +213,23 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 		salt: H256,
 		gas_limit: u64,
 	) -> ExitReason {
+		event!(TransactCreate2 {
+			caller,
+			value,
+			init_code: &init_code,
+			salt,
+			gas_limit,
+			address: self.create_address(CreateScheme::Create2 {
+				caller,
+				code_hash: H256::from_slice(Keccak256::digest(&init_code).as_slice()),
+				salt,
+			}),
+		});
+
 		let transaction_cost = gasometer::create_transaction_cost(&init_code);
 		match self.gasometer.record_transaction(transaction_cost) {
 			Ok(()) => (),
-			Err(e) => return e.into(),
+			Err(e) => return emit_exit!(e.into()),
 		}
 		let code_hash = self.backend.keccak256_h256(&init_code); //H256::from_slice(Keccak256::digest(&init_code).as_slice());
 
@@ -199,7 +241,7 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 			Some(gas_limit),
 			false,
 		) {
-			Capture::Exit((s, _, _)) => s,
+			Capture::Exit((s, _, _)) => emit_exit!(s),
 			Capture::Trap(_) => unreachable!(),
 		}
 	}
@@ -213,10 +255,18 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 		data: Vec<u8>,
 		gas_limit: u64,
 	) -> (ExitReason, Vec<u8>) {
+		event!(TransactCall {
+			caller,
+			address,
+			value,
+			data: &data,
+			gas_limit,
+		});
+		
 		let transaction_cost = gasometer::call_transaction_cost(&data);
 		match self.gasometer.record_transaction(transaction_cost) {
 			Ok(()) => (),
-			Err(e) => return (e.into(), Vec::new()),
+			Err(e) => return emit_exit!(e.into(), Vec::new()),
 		}
 
 		self.account_mut(caller).basic.nonce += U256::one();
@@ -232,7 +282,7 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 			target: address,
 			value
 		}), data, Some(gas_limit), false, false, false, context) {
-			Capture::Exit((s, v)) => (s, v),
+			Capture::Exit((s, v)) => emit_exit!(s, v),
 			Capture::Trap(_) => unreachable!(),
 		}
 	}
@@ -383,6 +433,19 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 			return Capture::Exit((ExitError::OutOfFund.into(), None, Vec::new()))
 		}
 
+		let address = self.create_address(scheme);
+                self.backend.create(&scheme, &address);
+		self.account_mut(caller).basic.nonce += U256::one();
+
+		event!(Create {
+			caller,
+			address,
+			scheme,
+			value,
+			init_code: &init_code,
+			target_gas
+		});
+
 		let mut after_gas = self.gasometer.gas(); // 0;
 		if take_l64 && CONFIG.call_l64_after_gas {
 			after_gas = l64(after_gas);
@@ -392,9 +455,6 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 		let gas_limit = core::cmp::min(after_gas, target_gas);
 		try_or_fail!(self.gasometer.record_cost(gas_limit));
 
-		let address = self.create_address(scheme);
-                self.backend.create(&scheme, &address);
-		self.account_mut(caller).basic.nonce += U256::one();
 
 		let mut substate = self.substate(gas_limit, false);
 		{
@@ -524,6 +584,15 @@ impl<'backend, B: 'backend + Backend> StackExecutor<'backend, B> {
 		const fn l64(gas: u64) -> u64 {
 			gas - gas / 64
 		}
+
+		event!(Call {
+			code_address,
+			transfer: &transfer,
+			input: &input,
+			target_gas,
+			is_static,
+			context: &context,
+		});
 
 		let mut after_gas = self.gasometer.gas(); // 0;
 		if take_l64 && CONFIG.call_l64_after_gas {
@@ -775,6 +844,12 @@ impl<'backend, B: Backend> Handler for StackExecutor<'backend, B> {
 	fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
 		let balance = self.balance(address);
 
+		event!(Suicide {
+			target,
+			address,
+			balance,
+		});
+
 		self.transfer(&Transfer {
 			source: address,
 			target,
@@ -787,6 +862,7 @@ impl<'backend, B: Backend> Handler for StackExecutor<'backend, B> {
 		Ok(())
 	}
 
+	#[cfg(not(feature = "tracing"))]
 	fn create(
 		&mut self,
 		caller: H160,
@@ -798,6 +874,26 @@ impl<'backend, B: Backend> Handler for StackExecutor<'backend, B> {
 		self.create_inner(caller, scheme, value, init_code, target_gas, true)
 	}
 
+	#[cfg(feature = "tracing")]
+	fn create(
+		&mut self,
+		caller: H160,
+		scheme: CreateScheme,
+		value: U256,
+		init_code: Vec<u8>,
+		target_gas: Option<u64>,
+	) -> Capture<(ExitReason, Option<H160>, Vec<u8>), Self::CreateInterrupt> {
+        let capture = self.create_inner(caller, scheme, value, init_code, target_gas, true);
+
+		if let Capture::Exit((ref reason, _, ref return_value)) = capture {
+			emit_exit!(reason, return_value);
+		}
+
+		capture
+	}
+
+
+	#[cfg(not(feature = "tracing"))]
 	fn call(
 		&mut self,
 		code_address: H160,
@@ -809,6 +905,26 @@ impl<'backend, B: Backend> Handler for StackExecutor<'backend, B> {
 	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
 		self.call_inner(code_address, transfer, input, target_gas, is_static, true, true, context)
 	}
+
+	#[cfg(feature = "tracing")]
+	fn call(
+		&mut self,
+		code_address: H160,
+		transfer: Option<Transfer>,
+		input: Vec<u8>,
+		target_gas: Option<u64>,
+		is_static: bool,
+		context: Context,
+	) -> Capture<(ExitReason, Vec<u8>), Self::CallInterrupt> {
+		let capture = self.call_inner(code_address, transfer, input, target_gas, is_static, true, true, context);
+
+        if let Capture::Exit((ref reason, ref return_value)) = capture {
+			emit_exit!(reason, return_value);
+		}
+
+		capture
+	}
+
 
 	fn pre_validate(
 		&mut self,
