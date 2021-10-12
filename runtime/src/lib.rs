@@ -1,7 +1,7 @@
 //! Runtime layer for EVM.
 
 #![deny(warnings)]
-#![forbid(unsafe_code, unused_variables, unused_imports)]
+#![forbid(unsafe_code, unused_variables)]
 #![deny(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(
 	clippy::module_name_repetitions,
@@ -9,6 +9,7 @@
 	clippy::missing_panics_doc
 )]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "tracing"), forbid(unused_imports))]
 
 extern crate alloc;
 
