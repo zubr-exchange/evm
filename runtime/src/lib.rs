@@ -76,6 +76,8 @@ macro_rules! step {
 		event!(StepResult {
 			result: &result,
 			return_value: &$self.machine.return_value(),
+                        stack: $self.machine.stack(),
+                        memory: $self.machine.memory(),
 		});
 
 		match result {

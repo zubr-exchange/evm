@@ -24,6 +24,8 @@ pub enum Event<'a> {
     StepResult {
         result: &'a Result<(), Capture<ExitReason, Trap>>,
         return_value: &'a [u8],
+        stack: &'a Stack,
+        memory: &'a Memory
     },
     SLoad {
         address: H160,
