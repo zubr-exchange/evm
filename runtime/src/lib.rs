@@ -45,6 +45,7 @@ use alloc::vec::Vec;
 
 macro_rules! step {
 	( $self:expr, $handler:expr, $return:tt $($err:path)?; $($ok:path)? ) => ({
+		let mut skip_step_result_event = true;
 		if let Some((opcode, stack)) = $self.machine.inspect() {
 			event!(Step {
 				context: &$self.context,
@@ -53,7 +54,8 @@ macro_rules! step {
 				stack,
 				memory: $self.machine.memory()
 			});
-			
+			skip_step_result_event = false;
+	
 			match $handler.pre_validate(&$self.context, opcode, stack) {
 				Ok(()) => (),
 				Err(e) => {
@@ -73,12 +75,14 @@ macro_rules! step {
 
 		let result = $self.machine.step();
 
-		event!(StepResult {
-			result: &result,
-			return_value: &$self.machine.return_value(),
-                        stack: $self.machine.stack(),
-                        memory: $self.machine.memory(),
-		});
+		if !skip_step_result_event {
+			event!(StepResult {
+				result: &result,
+				return_value: &$self.machine.return_value(),
+							stack: $self.machine.stack(),
+							memory: $self.machine.memory(),
+			});
+		}
 
 		match result {
 			Ok(()) => $($ok)?(()),
